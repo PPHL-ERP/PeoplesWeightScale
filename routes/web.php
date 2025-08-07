@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\WeightTransactionController;
 */
 use App\Http\Controllers\WebAuthController;
 use App\Http\Controllers\PrintController;
+use App\Http\Controllers\DashboardTableController;
 
 Route::get('/login', [WebAuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [WebAuthController::class, 'login']);
@@ -31,6 +32,9 @@ Route::middleware('web.jwt')->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    // Data table page
+    Route::get('/dashboard-table', [DashboardTableController::class, 'index'])->name('dashboard-table');
 
 
     // Route::get('/', function () {
