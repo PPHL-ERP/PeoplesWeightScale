@@ -13,9 +13,41 @@ use App\Http\Controllers\Api\WeightTransactionController;
 | be assigned to the "web" middleware group. Make something great!
 |
 */
+use App\Http\Controllers\WebAuthController;
+use App\Http\Controllers\PrintController;
 
+Route::get('/login', [WebAuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [WebAuthController::class, 'login']);
+Route::get('/logout', [WebAuthController::class, 'logout'])->name('logout');
 Route::get('/', function () {
-    return view('welcome');
+
+    if (!session()->has('jwt_token')) {
+        return redirect()->route('login');
+    }
+    return redirect()->route('dashboard');
 });
-Route::get('/weight-transactions', [WeightTransactionController::class, 'showTable'])
-    ->name('weight.transactions.table');
+// Protected Routes
+Route::middleware('web.jwt')->group(function () {
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
+
+
+    // Route::get('/', function () {
+    //     return view('welcome');
+    // });
+    // Route::get('/dashboard', [WeightTransactionController::class, 'showTable'])
+    //     ->name('weight.transactions.table');
+        Route::get('/dashboard', [WeightTransactionController::class, 'showTable'])->name('dashboard');
+        // A4 Print
+Route::get('/weight-transactions/{id}/print-a4', [WeightTransactionController::class, 'printA4'])->name('transactions.printA4');
+
+// POS Print
+Route::get('/weight-transactions/{id}/print-pos', [WeightTransactionController::class, 'printPOS'])->name('transactions.printPOS');
+
+Route::get('/print/invoice/{id}', [PrintController::class, 'printInvoice'])->name('print.invoice');
+Route::get('/print/pos/{id}', [PrintController::class, 'printPOS'])->name('print.pos');
+
+});
+
+

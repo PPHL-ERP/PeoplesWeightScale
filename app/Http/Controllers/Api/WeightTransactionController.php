@@ -11,8 +11,10 @@ use Illuminate\Http\Request;
 class WeightTransactionController extends Controller
 {
 
-    public function showTable()
+    public function showTable(Request $request)
     {
+        $search = $request->input('search');
+
         $transactions = WeightTransaction::query()
             ->leftJoin('w_customer', 'weight_transactions.customer_id', '=', 'w_customer.id')
             ->leftJoin('w_vendor', 'weight_transactions.vendor_id', '=', 'w_vendor.id')
@@ -23,10 +25,28 @@ class WeightTransactionController extends Controller
                 'w_vendor.vName as vendor_name',
                 'sectors.name as sector_name'
             )
+            ->when($search, function ($query, $search) {
+                $query->where('weight_transactions.transaction_id', 'like', "%{$search}%")
+                      ->orWhere('weight_transactions.vehicle_no', 'like', "%{$search}%")
+                      ->orWhere('w_customer.cName', 'like', "%{$search}%")
+                      ->orWhere('w_vendor.vName', 'like', "%{$search}%");
+            })
             ->orderByDesc('weight_transactions.id')
-            ->get(); // 👈 Get all data (no pagination)
+            ->paginate(10); // Pagination
 
-        return view('weight_transactions.index', compact('transactions'));
+        return view('dashboard', compact('transactions', 'search'));
+    }
+
+    public function printA4($id)
+    {
+        $transaction = WeightTransaction::with(['customer', 'vendor', 'sector'])->findOrFail($id);
+        return view('print.transaction_a4', compact('transaction'));
+    }
+
+    public function printPOS($id)
+    {
+        $transaction = WeightTransaction::with(['customer', 'vendor', 'sector'])->findOrFail($id);
+        return view('print.transaction_pos', compact('transaction'));
     }
 
 

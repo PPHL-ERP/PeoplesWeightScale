@@ -7,7 +7,7 @@ use App\Services\AccountsDebitService;
 use App\Services\AddAccountLedgerService;
 use App\Services\InvoiceWisePaymentService;
 use Illuminate\Support\ServiceProvider;
-
+use Illuminate\Pagination\Paginator;
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -41,6 +41,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Paginator::useBootstrap();
     }
 }
