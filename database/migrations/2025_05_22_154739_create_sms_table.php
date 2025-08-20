@@ -13,20 +13,31 @@ return new class extends Migration
     {
         Schema::create('sms', function (Blueprint $table) {
             $table->id();
+
+            // API & Gateway Info
             $table->string('apiKey')->nullable();
             $table->string('gatewayName')->nullable();
-            $table->string('mSenderId')->nullable();
-            $table->integer('nmSenderId')->nullable();
-            $table->string('language')->nullable();
-            $table->string('type')->nullable();
+
+            // Sender IDs
+            $table->string('mSenderId')->nullable();       // main sender id
+            $table->integer('nmSenderId')->nullable();     // numeric sender id
+
+            // Message meta
+            $table->string('language')->nullable();        // e.g. EN, BN
+            $table->string('type')->nullable();            // e.g. OTP, Promo
             $table->string('url')->nullable();
+
+            // Headers & Footers
             $table->string('headerTxtEn')->nullable();
             $table->string('headerTxtBn')->nullable();
             $table->string('footerTxtEn')->nullable();
             $table->string('footerTxtBn')->nullable();
-            $table->string('status')->nullable();
-            $table->softDeletes();
-            $table->timestamps();
+
+            // Status
+            $table->string('status')->nullable();          // Active / Inactive
+
+            $table->softDeletes(); // deleted_at
+            $table->timestamps();  // created_at, updated_at
         });
     }
 

@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('w_material', function (Blueprint $table) {
             $table->id();
             $table->string('mId')->nullable();
+            $table->string('oldmId')->nullable();
             $table->string('mName')->nullable();
+            $table->string('mNameBangla')->nullable();
             $table->string(column: 'categoryType')->nullable();
             $table->string('note')->nullable();
             $table->softDeletes();

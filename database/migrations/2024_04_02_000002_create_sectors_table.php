@@ -12,19 +12,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('sectors', function (Blueprint $table) {
-            $table->bigIncrements('id'); // Primary key with auto-increment
-            $table->bigInteger('companyId')->nullable();
+            $table->id(); // BIGINT UNSIGNED AUTO_INCREMENT in MySQL
+
+            // Foreign key to companies
+            $table->unsignedBigInteger('companyId')->nullable()->index();
+
             $table->string('name')->nullable()->index();
-            $table->integer('isFarm')->nullable()->index();
-            $table->tinyInteger('isSalesPoint')->default(0);
-            $table->text('salesPointName')->nullable();
+            $table->boolean('isFarm')->default(0)->index(); // better than integer for true/false
+            $table->boolean('isSalesPoint')->default(0);
+            $table->string('salesPointName')->nullable();
+
             $table->longText('description')->nullable();
             $table->string('status')->nullable();
+
             $table->softDeletes();
             $table->timestamps();
-            // You can add more indexes and foreign keys if needed
-            // $table->index(['name']);
-            // $table->foreign('other_id')->references('id')->on('other_table')->onDelete('cascade');
+
+            // Optional: enforce FK if companies table exists
+            // $table->foreign('companyId')->references('id')->on('companies')->nullOnDelete();
         });
     }
 

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->softDeletes();
             $table->timestamps();
 
+            
             // Foreign Key Constraints
             $table->foreign('categoryId')->references('id')->on('categories')->onDelete('set null');
             $table->foreign('crBy')->references('id')->on('users')->onDelete('set null');

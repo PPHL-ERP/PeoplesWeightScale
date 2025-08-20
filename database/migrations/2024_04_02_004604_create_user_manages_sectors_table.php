@@ -13,9 +13,16 @@ return new class extends Migration
     {
         Schema::create('user_manages_sectors', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('sectorId')->nullable();
-            $table->bigInteger('userId')->nullable();
+
+            // Use unsignedBigInteger for MySQL FK consistency
+            $table->unsignedBigInteger('sectorId')->nullable()->index();
+            $table->unsignedBigInteger('userId')->nullable()->index();
+
             $table->timestamps();
+
+            // Optional: foreign key constraints (if related tables exist)
+            // $table->foreign('sectorId')->references('id')->on('sectors')->nullOnDelete();
+            // $table->foreign('userId')->references('id')->on('users')->cascadeOnDelete();
         });
     }
 

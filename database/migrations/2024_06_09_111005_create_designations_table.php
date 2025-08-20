@@ -13,13 +13,30 @@ return new class extends Migration
     {
         Schema::create('designations', function (Blueprint $table) {
             $table->id();
+
+            // Basic designation info
             $table->string('name')->nullable();
-            $table->bigInteger('departmentId')->nullable()->index();
-            $table->tinyInteger('leaveCount')->nullable();
+
+            // Department relationship
+            $table->unsignedBigInteger('departmentId')->nullable()->index();
+
+            // Leave allocation
+            $table->tinyInteger('leaveCount')->nullable(); // up to 127 (signed) or 255 (unsigned)
+
+            // Details
             $table->longText('description')->nullable();
-            $table->enum('status', ['approved', 'declined'])->default('approved')->nullable();
+
+            // Status (enum is supported in MySQL)
+            $table->enum('status', ['approved', 'declined'])
+                  ->default('approved')
+                  ->nullable();
+
+            // Soft delete & timestamps
             $table->softDeletes();
             $table->timestamps();
+
+            // Optional FK if you have departments table
+            // $table->foreign('departmentId')->references('id')->on('departments')->nullOnDelete();
         });
     }
 

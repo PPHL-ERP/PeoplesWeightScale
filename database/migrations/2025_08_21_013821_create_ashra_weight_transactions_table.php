@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('weight_transactions', function (Blueprint $table) {
+        Schema::create('ashra_weight_transactions', function (Blueprint $table) {
             $table->id(); // BIGINT unsigned AUTO_INCREMENT in MySQL
 
             $table->string('transaction_id')->nullable()->index();

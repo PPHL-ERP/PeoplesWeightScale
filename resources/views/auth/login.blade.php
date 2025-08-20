@@ -23,24 +23,36 @@
           <div class="card rounded-0 overflow-hidden shadow-none border mb-5 mb-lg-0">
             <div class="row g-0">
               <div class="col-12 order-1 col-xl-8 d-flex align-items-center justify-content-center border-end">
-                <img src="{{ asset('assets/images/error/auth-img-7.png') }}" class="img-fluid" alt="">
+                <img src="{{ asset('assets/images/loginPageimg.png') }}" class="img-fluid" alt="">
               </div>
               <div class="col-12 col-xl-4 order-xl-2">
                 <div class="card-body p-4 p-sm-5">
-                  <h5 class="card-title">Sign In</h5>
-                  <p class="card-text mb-4">See your growth and get consulting support!</p>
+                    <div class="rounded-3 bg-primary bg-gradient text-white fw-bold d-flex align-items-center justify-content-center me-3" style="width:44px;height:20px;">
+                        PW
+                      </div>
+                      <h3 class="card-title mb-0">
+                        Peoples <span class="text-primary brand-gradient">WeighHub</span>
+                      </h3>
+                    <p class="mb-1 fst-italic text-muted">“Connect. Weigh. Control.”</p>
+
+                    </div>
+
+                    <!-- Section title with subtle highlight -->
+                    <h5 class="card-title fw-bold mb-2 hl-underline bold text-center">Sign In</h5>
+
+                    <!-- Taglines -->
                   <form class="form-body" method="POST" action="{{ route('login') }}">
                     @csrf
                     <div class="row g-3">
                       <div class="col-12">
-                        <label for="inputEmailAddress" class="form-label">Email Address</label>
+                        <label for="inputEmailAddress" class="form-label ">User Name/Email </label>
                         <div class="ms-auto position-relative">
                           <div class="position-absolute top-50 translate-middle-y search-icon px-3"><i class="bi bi-envelope-fill"></i></div>
                           <input type="email" name="email" class="form-control radius-30 ps-5" id="inputEmailAddress" placeholder="Email" required autofocus>
                         </div>
                       </div>
                       <div class="col-12">
-                        <label for="inputChoosePassword" class="form-label">Enter Password</label>
+                        <label for="inputChoosePassword" class="form-label bold">Enter Password</label>
                         <div class="ms-auto position-relative">
                           <div class="position-absolute top-50 translate-middle-y search-icon px-3"><i class="bi bi-lock-fill"></i></div>
                           <input type="password" name="password" class="form-control radius-30 ps-5" id="inputChoosePassword" placeholder="Password" required>
@@ -52,16 +64,16 @@
                           <label class="form-check-label" for="flexSwitchCheckChecked">Remember Me</label>
                         </div>
                       </div>
-                      <div class="col-6 text-end">
+                      {{-- <div class="col-6 text-end">
                         <a href="#">Forgot Password ?</a>
-                      </div>
+                      </div> --}}
                       <div class="col-12">
                         <div class="d-grid">
                           <button type="submit" class="btn btn-primary radius-30">Sign In</button>
                         </div>
                       </div>
                       <div class="col-12">
-                        <div class="login-separater text-center"> <span>OR SIGN IN WITH EMAIL</span>
+                        {{-- <div class="login-separater text-center"> <span>OR SIGN IN WITH EMAIL</span> --}}
                           <hr>
                         </div>
                       </div>
@@ -73,7 +85,7 @@
                         </div>
                       </div>
                       <div class="col-12 text-center">
-                        <p class="mb-0">Don't have an account yet? <a href="#">Sign up here</a></p>
+                        {{-- <p class="mb-0">Don't have an account yet? <a href="#">Sign up here</a></p> --}}
                       </div>
                     </div>
                   </form>

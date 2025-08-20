@@ -1,14 +1,14 @@
 {{-- Sidebar extracted from dashboard template (index.html) --}}
 <aside class="sidebar-wrapper">
-  <div class="iconmenu"> 
+  <div class="iconmenu">
     <div class="nav-toggle-box">
       <div class="nav-toggle-icon"><i class="bi bi-list"></i></div>
     </div>
     <ul class="nav nav-pills flex-column">
-      <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboards">
+      <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Home">
         <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-dashboards" type="button"><i class="bi bi-house-door-fill"></i></button>
       </li>
-      <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Application">
+      {{-- <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Application">
         <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-application" type="button"><i class="bi bi-grid-fill"></i></button>
       </li>
       <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Widgets">
@@ -43,7 +43,7 @@
       </li>
       <li class="nav-item" data-bs-toggle="tooltip" data-bs-placement="right" title="Pages">
         <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-pages" type="button"><i class="bi bi-award-fill"></i></button>
-      </li>
+      </li> --}}
     </ul>
   </div>
   <div class="textmenu">
@@ -55,15 +55,15 @@
         <div class="list-group list-group-flush">
           <div class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
-              <h5 class="mb-0">Dashboards</h5>
+              <h5 class="mb-0">Peoples Weighthub</h5>
             </div>
-            <small class="mb-0">Some placeholder content</small>
+            <small class="mb-0">“Connect. Weigh. Control.”</small>
           </div>
-          <a href="#" class="list-group-item"><i class="bi bi-cart-plus"></i> e-Commerce</a>
+          {{-- <a href="#" class="list-group-item"><i class="bi bi-cart-plus"></i> e-Commerce</a>
           <a href="#" class="list-group-item"><i class="bi bi-wallet"></i> Sales</a>
           <a href="#" class="list-group-item"><i class="bi bi-bar-chart-line"></i> Analytics</a>
-          <a href="#" class="list-group-item"><i class="bi bi-archive"></i> Project Management</a>
-          <a href="{{ route('dashboard') }}" class="list-group-item"><i class="bi bi-cast"></i> CMS Dashboard</a>
+          <a href="#" class="list-group-item"><i class="bi bi-archive"></i> Project Management</a> --}}
+          <a href="{{ route('dashboard') }}" class="list-group-item"><i class="bi bi-cast"></i> Scale Dashboard</a>
           <a href="{{ route('dashboard-table') }}" class="list-group-item"><i class="bi bi-table"></i> Weight Table</a>
         </div>
       </div>

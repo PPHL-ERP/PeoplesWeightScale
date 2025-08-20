@@ -13,9 +13,20 @@ return new class extends Migration
     {
         Schema::create('user_manage_products', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('productCategoryId')->nullable();
-            $table->bigInteger('userId')->nullable();
+
+            // Use unsignedBigInteger if linking to another table’s primary key
+            $table->unsignedBigInteger('productCategoryId')->nullable();
+            $table->unsignedBigInteger('userId')->nullable();
+
             $table->timestamps();
+
+            // Indexes for faster queries
+            $table->index('productCategoryId');
+            $table->index('userId');
+
+            // Optional: Add foreign keys if related tables exist
+            // $table->foreign('productCategoryId')->references('id')->on('product_categories')->nullOnDelete();
+            // $table->foreign('userId')->references('id')->on('users')->cascadeOnDelete();
         });
     }
 

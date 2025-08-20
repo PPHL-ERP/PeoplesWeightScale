@@ -13,10 +13,17 @@ return new class extends Migration
     {
         Schema::create('upazilas', function (Blueprint $table) {
             $table->id();
-            $table->integer('district_id');
+
+            // Better to use unsignedBigInteger for FK references
+            $table->unsignedBigInteger('district_id')->index();
+
             $table->string('name');
             $table->string('bn_name');
+
             $table->timestamps();
+
+            // Optional: add FK if districts table exists
+            // $table->foreign('district_id')->references('id')->on('districts')->cascadeOnDelete();
         });
     }
 

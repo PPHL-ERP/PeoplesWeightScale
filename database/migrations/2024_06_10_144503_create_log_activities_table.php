@@ -12,16 +12,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('log_activities', function (Blueprint $table) {
-            $table->increments('id');
+            $table->id(); // BIGINT UNSIGNED AUTO_INCREMENT (MySQL)
+
             $table->string('subject');
             $table->string('url');
             $table->string('method');
-            $table->string('ip');
+            $table->string('ip', 45); // supports IPv6 also
+
             $table->string('agent')->nullable();
-            $table->integer('user_id')->nullable();
-            $table->decimal('latitude', 10, 7)->nullable(); // Precision 10, Scale 7
-            $table->decimal('longitude', 10, 7)->nullable(); // Precision 10, Scale 7
+            $table->unsignedBigInteger('user_id')->nullable()->index();
+
+            // Geo precision
+            $table->decimal('latitude', 10, 7)->nullable();   // e.g., 23.8103312
+            $table->decimal('longitude', 10, 7)->nullable();  // e.g., 90.4125218
+
             $table->timestamps();
+
+            // Optional FK if you want link with users
+            // $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
         });
     }
 
