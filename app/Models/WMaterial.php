@@ -12,4 +12,12 @@ class WMaterial extends Model
 
     protected $table = 'w_material';
     protected $guarded = ['id'];
+
+    protected $fillable = [
+        'mId', 'oldmId', 'mName', 'mNameBangla', 'categoryType', 'note',
+    ];
+
+    protected $casts = [
+        'deleted_at' => 'datetime',
+    ];
 }

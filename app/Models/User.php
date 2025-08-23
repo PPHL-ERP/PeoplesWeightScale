@@ -2,65 +2,115 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
-use Tymon\JWTAuth\Contracts\JWTSubject;
-class User extends Authenticatable implements JWTSubject
+// Sanctum ব্যবহার করলে রাখো, না হলে এই লাইন আর trait দুটোই তুলে দাও
+use Laravel\Sanctum\HasApiTokens;
+
+use App\Models\Role;
+
+class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    // Sanctum না থাকলে HasApiTokens বাদ দাও
+    //use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
+    protected $table = 'users';
 
+    /**
+     * Guarded/Fillable: সহজে রাখতে guarded ব্যবহার করছি
+     * চাইলে fillable-এ নির্দিষ্ট ফিল্ড তালিকাও দিতে পারো।
+     */
+    protected $guarded = ['id'];
 
-    protected $guarded = [];
-
-
+    /**
+     * Sensitive ফিল্ড হাইড করো
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-
+    /**
+     * Casting
+     */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'deleted_at'        => 'datetime',
+        'isSuperAdmin'      => 'boolean',
+        'isAdmin'           => 'boolean',
+        'isBanned'          => 'boolean',
+        'status'            => 'integer',
     ];
-//    public function employee(){
-//        return $this->hasOne(Employee::class,'id','employee_id');
-//    }
+
+    /**
+     * পাসওয়ার্ড সেট করলে অটো-হ্যাশ (আগে থেকে হ্যাশ হলে আবার করবে না)
+     */
+    public function setPasswordAttribute($value): void
+    {
+        if (!$value) return;
+
+        // ইতিমধ্যে bcrypt হ্যাশ কিনা চেক (যদি $2y$ দিয়ে শুরু হয়)
+        if (is_string($value) && str_starts_with($value, '$2y$')) {
+            $this->attributes['password'] = $value;
+        } else {
+            $this->attributes['password'] = bcrypt($value);
+        }
+    }
+
+    /* =======================
+     *      Relationships
+     * ======================= */
+
+    // User ↔ Roles (pivot: user_has_roles, keys: userId, roleId)
     public function roles()
     {
-        return $this->hasMany(UserHasRoles::class, 'userId');
+        return $this->belongsToMany(Role::class, 'user_has_roles', 'userId', 'roleId')
+                    ->withTimestamps();
     }
 
+    // (ঐচ্ছিক) অন্য রিলেশন থাকলে এখানে রাখো
+    // public function employee() { return $this->belongsTo(Employee::class, 'employeeId'); }
+    // public function managedProduct() { return $this->belongsTo(UserManageProduct::class, 'userManageProductId'); }
 
-    public function roles2() {
-        return $this->belongsToMany(Role::class, 'user_has_roles', 'userId', 'roleId');
-    }
+    /* =======================
+     *   Role/Permission Helper
+     * ======================= */
 
-    public function sectors()
+    // রোল আছে?
+    public function hasRole(string|array $roles): bool
     {
-        return $this->hasMany(UserManagesSectors::class, 'userId');
+        if ($this->isSuperAdmin) return true;
+
+        $roles = (array) $roles;
+        return $this->roles()
+            ->whereIn('roleName', $roles)
+            ->exists();
     }
 
-    public function categories()
+    // পারমিশন আছে? (role_has_permissions এর মাধ্যমে)
+    public function hasPermission(string $permission): bool
     {
-        return $this->hasMany(UserManageProduct::class, 'userId');
+        if ($this->isSuperAdmin) return true;
+
+        return $this->roles()
+            ->whereHas('permissions', function ($q) use ($permission) {
+                $q->where('name', $permission);
+            })
+            ->exists();
     }
 
-    public function empSalesGroup()
+    // ইউজারকে রোল অ্যাসাইন করো (id/নাম/Role object—সবই সাপোর্টেড)
+    public function giveRole(string|int|Role $role): void
     {
-        return $this->hasOne(EmployeeSalesGroup::class, 'id', 'groupId');
-    }
+        $roleId = $role instanceof Role
+            ? $role->id
+            : (is_numeric($role) ? (int) $role : Role::where('roleName', $role)->value('id'));
 
-
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
+        if ($roleId) {
+            // pivot: user_has_roles (userId, roleId)
+            $this->roles()->syncWithoutDetaching([$roleId]);
+        }
     }
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
-
 }

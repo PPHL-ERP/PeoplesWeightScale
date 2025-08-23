@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class WMaterialRequest extends FormRequest
 {
@@ -21,10 +22,29 @@ class WMaterialRequest extends FormRequest
      */
     public function rules(): array
     {
+        // update হলে রুটের {id} ধরব
+        $id = $this->route('id');
+
         return [
-            'mName' => 'required|string|max:255',
-            'categoryType' => 'nullable',
-            'note' => 'nullable|string|max:500',
+            'mId'         => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('w_material', 'mId')
+                    ->ignore($id)                 // update-এ নিজের রেকর্ড বাদ
+                    ->whereNull('deleted_at'),    // soft-deleted থাকলে allow
+            ],
+            'oldmId'      => ['nullable','string','max:50'],
+            'mName'       => ['required','string','max:200'],
+            'mNameBangla' => ['nullable','string','max:200'],
+            'categoryType' => ['nullable','string','max:200'],
+            'note'        => ['nullable','string','max:1000'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'mName.required' => 'Material name is required.',
+            'mId.unique'     => 'This Material ID is already used.',
         ];
     }
 }

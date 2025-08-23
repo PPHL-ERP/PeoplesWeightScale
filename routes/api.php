@@ -75,9 +75,9 @@ use App\Http\Controllers\Api\{
     SmsController,
     PaymentReceiveReportController,
     WeightTransactionController,
-    WCustomerController,
-    WMaterialController,
-    WVendorController
+    // WCustomerController,
+    // WMaterialController,
+    // WVendorController
 
 };
 use App\Http\Controllers\Api\Chicks\BreedController;
@@ -132,9 +132,9 @@ Route::put('/updateweight-transactions/{id}', [WeightTransactionController::clas
 
 // 🗑️ Delete one
 Route::delete('/weight-transactions/{id}', [WeightTransactionController::class, 'destroy']);
-Route::apiResource('w-customer',WCustomerController::class);
-Route::apiResource('w-material',WMaterialController::class);
-Route::apiResource('w-vendor',WVendorController::class);
+// Route::apiResource('w-customer',WCustomerController::class);
+// Route::apiResource('w-material',WMaterialController::class);
+// Route::apiResource('w-vendor',WVendorController::class);
 Route::get('/dealer-view-all', [AllViewController::class, 'dealerAllView']);
 Route::get('/sector-view-all', [AllViewController::class, 'sectorAllView']);
 Route::get('/productType', [AllViewController::class, 'productType']);

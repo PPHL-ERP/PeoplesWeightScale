@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-
+use Illuminate\Validation\Rule;
 class WCustomerRequest extends FormRequest
 {
     /**
@@ -19,13 +19,33 @@ class WCustomerRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
-    public function rules(): array
-    {
-        return [
-            'cName' => 'required|string|max:255',
-            'phone' => 'nullable',
-            'address' => 'nullable',
-            'note' => 'nullable|string|max:500',
-        ];
-    }
+
+     public function rules(): array
+     {
+         // update হলে রুটের {id} ধরব
+         $id = $this->route('id');
+
+         return [
+             'cId'         => [
+                 'nullable', 'string', 'max:50',
+                 Rule::unique('w_customer', 'cId')
+                     ->ignore($id)                 // update-এ নিজের রেকর্ড বাদ
+                     ->whereNull('deleted_at'),    // soft-deleted থাকলে allow
+             ],
+             'oldcId'      => ['nullable','string','max:50'],
+             'cName'       => ['required','string','max:200'],
+             'cNameBangla' => ['nullable','string','max:200'],
+             'phone'       => ['nullable','string','max:30'],
+             'address'     => ['nullable','string','max:500'],
+             'note'        => ['nullable','string','max:1000'],
+         ];
+     }
+
+     public function messages(): array
+     {
+         return [
+             'cName.required' => 'Customer name is required.',
+             'cId.unique'     => 'This Customer ID is already used.',
+         ];
+     }
 }

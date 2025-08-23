@@ -12,4 +12,12 @@ class WCustomer extends Model
 
     protected $table = 'w_customer';
     protected $guarded = ['id'];
+
+    protected $fillable = [
+        'cId', 'oldcId', 'cName', 'cNameBangla', 'phone', 'address', 'note',
+    ];
+
+    protected $casts = [
+        'deleted_at' => 'datetime',
+    ];
 }

@@ -30,5 +30,8 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
+    'remote_api' => [
+        'base' => env('API_BASE', 'http://43.224.116.185:8010/api/v2/'),
+    ],
 
 ];
