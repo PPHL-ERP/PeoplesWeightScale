@@ -143,4 +143,17 @@ Route::get('/print/pos/{id}', [PrintController::class, 'printPOS'])->name('print
             ->only(['index','create','store','edit','update','destroy']);
     });
 
+
+    // Users CRUD (minimal)
+Route::middleware(['web.jwt','role:Admin'])->group(function () {
+    Route::get('/users', [UserRoleController::class, 'index'])->name('users.index');
+
+    // NEW:
+    Route::get('/users/create', [UserRoleController::class, 'create'])->name('users.create')->middleware('permission:users.create');
+    Route::post('/users', [UserRoleController::class, 'store'])->name('users.store')->middleware('permission:users.create');
+
+    Route::get('/users/{id}/roles', [UserRoleController::class, 'edit'])->name('users.roles.edit');
+    Route::put('/users/{id}/roles', [UserRoleController::class, 'update'])->name('users.roles.update');
+});
+
 });

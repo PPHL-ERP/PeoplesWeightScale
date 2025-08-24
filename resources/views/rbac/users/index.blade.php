@@ -4,12 +4,17 @@
 @section('content')
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Users</h2>
+    <div class="d-flex gap-2">
     <form method="GET" class="d-flex gap-2">
       <input type="text" name="s" value="{{ request('s') }}" class="form-control" placeholder="Search name/email">
       <button class="btn btn-primary">Search</button>
     </form>
+    <a href="{{ route('users.create') }}" class="btn btn-success">+ Create</a>
   </div>
-
+</div>
+@if(session('success'))
+  <div class="alert alert-success">{{ session('success') }}</div>
+@endif
   <div class="table-responsive">
     <table class="table table-bordered table-striped align-middle">
       <thead class="table-dark">
