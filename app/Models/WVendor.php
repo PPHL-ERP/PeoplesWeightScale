@@ -12,12 +12,4 @@ class WVendor extends Model
 
     protected $table = 'w_vendor';
     protected $guarded = ['id'];
-
-    protected $fillable = [
-        'vId', 'oldvId', 'vName', 'vNamebangla', 'phone', 'address', 'note',
-    ];
-
-    protected $casts = [
-        'deleted_at' => 'datetime',
-    ];
 }

@@ -65,36 +65,6 @@
           <a href="#" class="list-group-item"><i class="bi bi-archive"></i> Project Management</a> --}}
           <a href="{{ route('dashboard') }}" class="list-group-item"><i class="bi bi-cast"></i> Scale Dashboard</a>
           <a href="{{ route('dashboard-table') }}" class="list-group-item"><i class="bi bi-table"></i> Weight Table</a>
-          <a href="{{ route('weight_transactions.index') }}" class="list-group-item"><i class="bi bi-table"></i> Weight Transactions</a>
-          <a href="{{ route('w_vendors.index') }}" class="list-group-item"><i class="bi bi-table"></i>Vendors </a>
-          <a href="{{ route('w_customers.index') }}" class="list-group-item"><i class="bi bi-table"></i>Customers </a>
-          <a href="{{ route('w_materials.index') }}" class="list-group-item"><i class="bi bi-table"></i>Materials </a>
-
-           {{-- ===== Access Control (Admin only) ===== --}}
-  @if(auth()->user()?->hasRole('Admin'))
-  <div class="list-group-item text-uppercase small text-muted">Access Control</div>
-
-  <a href="{{ route('users.index') }}" class="list-group-item {{ request()->routeIs('users.*') ? 'active' : '' }}">
-    <i class="bi bi-people"></i> Users
-  </a>
-
-  <a href="{{ route('roles.index') }}" class="list-group-item {{ request()->routeIs('roles.*') ? 'active' : '' }}">
-    <i class="bi bi-shield-lock"></i> Roles
-  </a>
-
-  <a href="{{ route('permissions.index') }}" class="list-group-item {{ request()->routeIs('permissions.*') ? 'active' : '' }}">
-    <i class="bi bi-key"></i> Permissions
-  </a>
-
-  {{--
-    নোট: Users ↔ Roles assign করতে আমরা routes দিয়েছি:
-      GET  /users/{id}/roles   -> users.roles.edit (UserRoleController@edit)
-      PUT  /users/{id}/roles   -> users.roles.update
-    এটা নির্দিষ্ট user id লাগে, তাই সাইডবারে স্ট্যাটিক লিংক না দিয়ে
-    "Users list" পেজ থেকে "Assign Roles" বাটন দিন। (users.index থাকলে এখানে লিংক যোগ করতে পারো)
-  --}}
-@endif
-{{-- ===== /Access Control ===== --}}
         </div>
       </div>
       {{-- Other tab panes can be added here as needed --}}
