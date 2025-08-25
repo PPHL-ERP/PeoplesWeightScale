@@ -9,16 +9,8 @@ class Permission extends Model
 {
     use HasFactory;
     protected $guarded = ['id'];
-    protected $fillable = ['name'];
-
-    // public function roles()
-    // {
-    //     return $this->belongsToMany(Role::class);
-    // }
-
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'role_has_permissions', 'permissionId', 'roleId')
-                    ->withTimestamps();
+        return $this->belongsToMany(Role::class);
     }
 }
