@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserEmployeeSyncController;
+use App\Http\Controllers\SalesEmployeeFlatController;
+
 use App\Http\Controllers\Api\{
     AccountClassController,
     AccountDashboardController,
@@ -106,6 +108,7 @@ use App\Http\Controllers\Api\Feed\LabourPaymentController;
 use App\Http\Controllers\Api\Feed\FeedReportController;
 use App\Http\Controllers\Api\Feed\FeedSalesSummeryController;
 use App\Http\Controllers\Api\OrderDeliveryController;
+use App\Services\SalesEmployeeSyncService;
 
 /*
 |--------------------------------------------------------------------------
@@ -159,7 +162,20 @@ Route::group(['prefix' => 'v2', 'middleware' => 'jwt.verify'], function () {
     Route::post('/sms/send', [SmsController::class, 'sendToClient']);
     Route::apiResource('sms',SmsController::class);
 
+Route::get('/sync-sales-employees', function (SalesEmployeeSyncService $syncService) {
+        $result = $syncService->sync();
 
+        return response()->json([
+            'success' => $result['status'],
+            'new_records_added' => $result['new'],
+            'message' => $result['status']
+                ? "{$result['new']}টি নতুন রেকর্ড সংযুক্ত হয়েছে।"
+                : "ডেটা সিঙ্ক ব্যর্থ হয়েছে।"
+        ]);
+    });
+
+    Route::get('/sales-employees-flat', [SalesEmployeeFlatController::class, 'index']);
+    Route::post('/sales-employees-flat', [SalesEmployeeFlatController::class, 'store']);
 
 
 

@@ -12,7 +12,7 @@ use JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Validator;
-
+use Illuminate\Support\Facades\Hash;
 
 class RegisterController extends BaseController
 {
@@ -39,89 +39,50 @@ class RegisterController extends BaseController
     }
 
 
-//    public function login(Request $request)
-//    {
-//        $request->validate([
-//            'email' => 'required|string|email',
-//            'password' => 'required|string',
-//        ]);
-//
-//        if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
-//            $user = Auth::user();
-//            $success['token'] =  $user->createToken('MyApp')->plainTextToken;
-//            $success['name'] =  $user->name;
-//
-//            return $this->sendResponse($success, 'User login successfully.');
-//        } else {
-//            return $this->sendError('Unauthorised.', ['error' => 'Unauthorised']);
-//        }
-//    }
-
-//    public function login(Request $request)
-//    {
-//        $request->validate([
-//            'email' => 'required|string|email',
-//            'password' => 'required|string',
-//        ]);
-//        $credentials = $request->only('email', 'password');
-//        $token = Auth::guard('api')->attempt($credentials);
-//
-//        if (!$token) {
-//            return response()->json([
-//                'message' => 'Unauthorized',
-//            ], 401);
-//        }
-//
-//        $user = Auth::user();
-//        return response()->json([
-//            'user' => $user,
-//            'authorization' => [
-//                'token' => $token,
-//                'type' => 'bearer',
-//            ]
-//        ]);
-//    }
-
     public function login(Request $request)
-    {
-        $credentials = $request->only('email', 'password');
+{
+    $validator = Validator::make($request->all(), [
+        'email'    => ['required', 'string', 'max:100'], // can be email or username
+        'password' => ['required', 'string', 'min:8', 'max:50'],
+    ]);
 
-        //valid credential
-        $validator = Validator::make($credentials, [
-            'email' => 'required|email',
-            'password' => 'required|string|min:6|max:50'
-        ]);
-
-        //Send failed response if request is not valid
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->messages()], 200);
-        }
-
-        //Request is validated
-        //Crean token
-        try {
-            if (! $token = JWTAuth::attempt($credentials)) {
-                LogActivity::addToLog('login failed!');
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Login credentials are invalid.',
-                ], 400);
-            }
-        } catch (JWTException $e) {
-            return $credentials;
-            return response()->json([
-                'success' => false,
-                'message' => 'Could not create token.',
-            ], 500);
-        }
-        LogActivity::addToLog('login Successful!');
-        //Token created, return with success response and jwt token
-        return response()->json([
-            'success' => true,
-            'token' => $token,
-        ]);
+    if ($validator->fails()) {
+        return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
     }
 
+    $loginInput = $request->input('email');
+    $loginField = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+    $credentials = [$loginField => $loginInput, 'password' => $request->input('password')];
+
+    try {
+        if (! $token = JWTAuth::attempt($credentials)) {
+            LogActivity::addToLog('Login failed: Wrong credentials.');
+            return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
+        }
+    } catch (JWTException $e) {
+        return response()->json(['success' => false, 'message' => 'Token creation failed.'], 500);
+    }
+
+    $user = auth()->user();
+
+    if ($user->status != 1) {
+        return response()->json(['success' => false, 'message' => 'Your account is not active.'], 403);
+    }
+
+    if ($user->isBanned == 1) {
+        return response()->json(['success' => false, 'message' => 'Your account is banned.'], 403);
+    }
+
+    LogActivity::addToLog('Login successful for ' . $user->email);
+
+    return response()->json([
+        'success'    => true,
+        'message'    => 'Login successful',
+        'token'      => $token,
+        'token_type' => 'bearer',
+    ]);
+}
 
     public function update(UserRequest $request, $id)
     {
