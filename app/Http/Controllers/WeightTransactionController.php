@@ -8,7 +8,7 @@ use App\Models\WeightTransaction;
 
 class WeightTransactionController extends Controller
 {
-    public function index(Request $request)
+    public function indexold(Request $request)
     {
         $q = WeightTransaction::query();
 
@@ -31,6 +31,66 @@ class WeightTransactionController extends Controller
 
         return view('weight_transactions.index', compact('transactions'));
     }
+
+     public function index()
+    {
+        return view('weight_transactions.index'); // the Blade below
+    }
+
+    public function datatable(Request $request)
+    {
+        $q = WeightTransaction::query()->select([
+            'id',
+            'transaction_id',
+            'weight_type','transfer_type','select_mode',
+            'vehicle_type','vehicle_no',
+            'material','productType',
+            'gross_weight','tare_weight','real_net',
+            'volume','price','discount','amount',
+            'customer_name',
+            'sale_id','purchase_id',
+            'sector_name','username',
+            'status','created_at',
+        ]);
+
+        // ---- 6 filters ----
+        // 1) global text
+        if ($s = trim((string)$request->get('search_text'))) {
+            $q->where(function($x) use ($s){
+                $x->where('transaction_id','like',"%$s%")
+                  ->orWhere('vehicle_no','like',"%$s%")
+                  ->orWhere('customer_name','like',"%$s%")
+                //   ->orWhere('vendor_name','like',"%$s%")
+                  ->orWhere('material','like',"%$s%")
+                  ->orWhere('sector_name','like',"%$s%")
+                  ->orWhere('username','like',"%$s%");
+            });
+        }
+
+        // 2) date range
+        if ($from = $request->get('from_date')) {
+            $to = $request->get('to_date') ?: $from;
+            $q->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        }
+
+        // 3) weight type
+        if ($wt = $request->get('weight_type')) $q->where('weight_type', $wt);
+
+        // 4) transfer type
+        if ($tt = $request->get('transfer_type')) $q->where('transfer_type', $tt);
+
+        // 5) status
+        if ($st = $request->get('status')) $q->where('status', $st);
+
+        // 6) vehicle no
+        if ($vno = trim((string)$request->get('vehicle_no'))) {
+            $q->where('vehicle_no','like',"%$vno%");
+        }
+
+        $rows = $q->orderByDesc('created_at')->limit(2000)->get(); // cap for speed
+        return response()->json(['data' => $rows]);
+    }
+
 
     public function create()
     {

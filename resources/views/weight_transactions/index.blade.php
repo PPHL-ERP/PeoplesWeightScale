@@ -1,133 +1,245 @@
-{{-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>Weight Transactions</title>
-</head>
-<body>
-    <div class="container mt-4">
-        <h2 class="mb-4">Weight Transactions (All Data)</h2>
-
-        <table class="table table-bordered table-striped">
-            <thead class="table-dark">
-                <tr>
-                    <th>#</th>
-                    <th>Transaction ID</th>
-                    <th>Vehicle No</th>
-                    <th>Customer</th>
-                    <th>Vendor</th>
-                    <th>Sector</th>
-                    <th>Status</th>
-                    <th>Created At</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($transactions as $key => $transaction)
-                    <tr>
-                        <td>{{ $key + 1 }}</td>
-                        <td>{{ $transaction->transaction_id }}</td>
-                        <td>{{ $transaction->vehicle_no }}</td>
-                        <td>{{ $transaction->customer_name ?? 'N/A' }}</td>
-                        <td>{{ $transaction->vendor_name ?? 'N/A' }}</td>
-                        <td>{{ $transaction->sector_name ?? 'N/A' }}</td>
-                        <td>{{ ucfirst($transaction->status) }}</td>
-                        <td>{{ $transaction->created_at->format('d-m-Y H:i') }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="8" class="text-center">No Transactions Found</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</body>
-</html> --}}
-
-{{-- @extends('layouts.app') --}}
 @extends('layouts.dashboard')
 @section('title','Weight Transactions')
+
 @section('content')
-<div class="container">
-    <h2 class="mb-3">Weight Transactions</h2>
+<main class="page-content">
+  <div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+    <div class="breadcrumb-title pe-3">Tables</div>
+    <div class="ps-3">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="#"><i class="bx bx-home-alt"></i></a></li>
+        <li class="breadcrumb-item active">Weight Transactions</li>
+      </ol>
+    </div>
+  </div>
 
-    @if(session('success'))
-      <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
+  <h6 class="mb-0 text-uppercase">Scale Weight INFO</h6>
+  <hr/>
 
-    {{-- Search & Filters --}}
-    <form method="GET" action="{{ route('weight_transactions.index') }}" class="row g-2 mb-3">
-        <div class="col-md-4">
-            <input type="text" name="s" value="{{ request('s') }}" class="form-control" placeholder="Search transaction/vehicle/customer">
-        </div>
+  {{-- Filters (6 types) --}}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2">
         <div class="col-md-3">
-            <select name="status" class="form-select">
-                <option value="">-- All Status --</option>
-                @foreach (['Unfinished','Finished','Reject'] as $st)
-                   <option value="{{ $st }}" @selected(request('status')===$st)>{{ $st }}</option>
-                @endforeach
-            </select>
+          <label class="form-label">Global Search</label>
+          <input id="f_search" type="text" class="form-control"
+                 placeholder="Txn/Vehicle/Customer/Vendor/Material/Sector/User">
         </div>
         <div class="col-md-2">
-            <button class="btn btn-primary w-100">Filter</button>
+          <label class="form-label">From</label>
+          <input id="f_from" type="date" class="form-control">
         </div>
-        <div class="col-md-3 text-end">
-            <a href="{{ route('weight_transactions.create') }}" class="btn btn-success">+ Create</a>
+        <div class="col-md-2">
+          <label class="form-label">To</label>
+          <input id="f_to" type="date" class="form-control">
         </div>
-    </form>
+        <div class="col-md-2">
+          <label class="form-label">Weight Type</label>
+          <select id="f_weight_type" class="form-select">
+            <option value="">All</option>
+            <option>Sales</option>
+            <option>Purchase</option>
+            <option>Weighing Service</option>
+          </select>
+        </div>
+        <div class="col-md-1">
+          <label class="form-label">Transfer</label>
+          <select id="f_transfer_type" class="form-select">
+            <option value="">All</option>
+            <option>In</option>
+            <option>Out</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Status</label>
+          <select id="f_status" class="form-select">
+            <option value="">All</option>
+            <option>Active</option>
+            <option>completed</option>
+            <option>cancelled</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Vehicle No</label>
+          <input id="f_vehicle_no" type="text" class="form-control" placeholder="e.g. DHA-23-4456">
+        </div>
 
-    <div class="table-responsive">
-    <table class="table table-bordered align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>#</th>
-                <th>Txn ID</th>
-                <th>Vehicle</th>
-                <th>Customer</th>
-                <th>Gross</th>
-                <th>Tare</th>
-                <th>Real Net</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th width="180">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($transactions as $t)
-            <tr>
-                <td>{{ $t->id }}</td>
-                <td>{{ $t->transaction_id }}</td>
-                <td>{{ $t->vehicle_no }}</td>
-                <td>{{ $t->customer_name }}</td>
-                <td>{{ $t->gross_weight }}</td>
-                <td>{{ $t->tare_weight }}</td>
-                <td><strong>{{ $t->real_net }}</strong></td>
-                <td>
-                    @php $badge = $t->status==='Finished' ? 'success' : ($t->status==='Reject'?'danger':'secondary'); @endphp
-                    <span class="badge bg-{{ $badge }}">{{ $t->status ?? 'N/A' }}</span>
-                </td>
-                <td>{{ $t->created_at?->format('Y-m-d H:i') }}</td>
-                <td>
-                    <a href="{{ route('weight_transactions.show',$t->id) }}" class="btn btn-sm btn-outline-info">View</a>
-                    <a href="{{ route('weight_transactions.edit',$t->id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                    <form action="{{ route('weight_transactions.destroy',$t->id) }}" method="POST" class="d-inline"
-                          onsubmit="return confirm('Delete this transaction?')">
-                        @csrf
-                        @method('DELETE')
-                        <button class="btn btn-sm btn-outline-danger">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            @empty
-              <tr><td colspan="10" class="text-center text-muted">No data found</td></tr>
-            @endforelse
-        </tbody>
-    </table>
+        <div class="col-md-3 d-flex align-items-end gap-2">
+          <button id="btnApply" class="btn btn-primary w-100"><i class="bi bi-funnel me-1"></i>Apply</button>
+          <button id="btnReset" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i></button>
+        </div>
+      </div>
     </div>
+  </div>
 
-    {{ $transactions->links() }}
+  {{-- Table --}}
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="weights-table" class="table table-striped table-bordered w-100">
+          <thead>
+          <tr>
+            <th>#</th>
+            <th>Challan No</th>
+            <th>W-Type</th>
+            <th>Transfer</th>
+            <th>Vehicle Type</th>
+            <th>Vehicle No</th>
+            <th>Material</th>
+            <th>Product</th>
+            <th>Gross</th>
+            <th>Tare</th>
+            <th>Net</th>
+            <th>Vol</th>
+            <th>Price</th>
+            <th>Disc</th>
+            <th>Amount</th>
+            <th>Customer</th>
+            <th>Vendor</th>
+            <th>Sector</th>
+            <th>User</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Images</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+          <tr>
+            <th>#</th>
+            <th>Challan No</th>
+            <th>W-Type</th>
+            <th>Transfer</th>
+            <th>Vehicle Type</th>
+            <th>Vehicle No</th>
+            <th>Material</th>
+            <th>Product</th>
+            <th>Gross</th>
+            <th>Tare</th>
+            <th>Net</th>
+            <th>Vol</th>
+            <th>Price</th>
+            <th>Disc</th>
+            <th>Amount</th>
+            <th>Customer</th>
+            <th>Vendor</th>
+            <th>Sector</th>
+            <th>User</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Images</th>
+          </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+{{-- Demo Photo Modal --}}
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Transaction Photos (Demo)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="photoCarousel" class="carousel slide" data-bs-ride="carousel">
+          <div class="carousel-inner" id="photoCarouselInner"></div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#photoCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon"></span>
+            <span class="visually-hidden">Prev</span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#photoCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon"></span>
+            <span class="visually-hidden">Next</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
 </div>
 @endsection
+
+@push('styles')
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<style>.badge-upper{text-transform:uppercase}.num{text-align:right}.thumb-btn{white-space:nowrap}</style>
+@endpush
+
+@push('scripts')
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  function fmt2(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+  function netKG(g,t,real){const R=Number(real||0);return (R&&R>0)?R.toFixed(2):(Number(g||0)-Number(t||0)).toFixed(2)}
+  function fmtDate(v){const d=new Date(v);return [String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),d.getFullYear()].join('-')}
+  function demoPhotos(){return['https://picsum.photos/id/1011/1200/700','https://picsum.photos/id/1015/1200/700','https://picsum.photos/id/1025/1200/700']}
+
+  $(function(){
+    const table = $('#weights-table').DataTable({
+      processing:true,
+      pageLength:25,
+      order:[[20,'desc']], // Date
+      ajax:{
+        url: '{{ route('weight_transactions.datatable') }}',
+        data: function(d){
+          d.search_text   = $('#f_search').val();
+          d.from_date     = $('#f_from').val();
+          d.to_date       = $('#f_to').val();
+          d.weight_type   = $('#f_weight_type').val();
+          d.transfer_type = $('#f_transfer_type').val();
+          d.status        = $('#f_status').val();
+          d.vehicle_no    = $('#f_vehicle_no').val();
+        }
+      },
+      columns:[
+        {data:null, orderable:false, searchable:false, render:(d,t,r,m)=>m.row+1},
+        {data:'transaction_id'},
+        {data:'weight_type'},
+        {data:'transfer_type'},
+        {data:'vehicle_type'},
+        {data:'vehicle_no'},
+        {data:'material'},
+        {data:'productType'},
+        {data:'gross_weight', className:'num', render:v=>fmt2(v)},
+        {data:'tare_weight',  className:'num', render:v=>fmt2(v)},
+        {data:null,           className:'num', render:r=>fmt2(netKG(r.gross_weight,r.tare_weight,r.real_net))},
+        {data:'volume',  className:'num', render:v=>fmt2(v)},
+        {data:'price',   className:'num', render:v=>fmt2(v)},
+        {data:'discount',className:'num', render:v=>fmt2(v)},
+        {data:'amount',  className:'num', render:v=>fmt2(v)},
+        {data:'customer_name', defaultContent:'N/A'},
+        {data:'vendor_name',   defaultContent:'N/A'},
+        {data:'customer_name',   defaultContent:'N/A'},
+        {data:'username',      defaultContent:'N/A'},
+        {data:'status', render:v=>`<span class="badge ${v==='completed'?'bg-success':'bg-secondary'} badge-upper">${v||'N/A'}</span>`},
+        {data:'created_at', render:v=>fmtDate(v)},
+        {data:null, orderable:false, searchable:false,
+          render:r=>`<button class="btn btn-sm btn-outline-primary thumb-btn view-photos" data-id="${r.id}">
+                       <i class="bi bi-images me-1"></i> View
+                     </button>`}
+      ]
+    });
+
+    $('#btnApply').on('click', ()=> table.ajax.reload());
+    $('#btnReset').on('click', ()=>{
+      $('#f_search,#f_vehicle_no').val('');
+      $('#f_from,#f_to').val('');
+      $('#f_weight_type,#f_transfer_type,#f_status').val('');
+      table.ajax.reload();
+    });
+
+    // demo photo modal
+    $(document).on('click','.view-photos', function(){
+      const inner = $('#photoCarouselInner').empty();
+      demoPhotos().forEach((src,i)=> inner.append(
+        `<div class="carousel-item ${i===0?'active':''}">
+           <img src="${src}" class="d-block w-100" alt="photo ${i+1}">
+         </div>`));
+      new bootstrap.Modal(document.getElementById('photoModal')).show();
+    });
+  });
+</script>
+@endpush

@@ -40,7 +40,12 @@ Route::middleware('web.jwt')->group(function () {
     Route::get('/dashboard-table', [DashboardTableController::class, 'index'])->name('dashboard-table');
 
 // weight_transactions
-Route::get('/weight_transactions', [WeightTransactionController::class, 'index'])->name('weight_transactions.index');
+Route::get('/weight_transactions', [WeightTransactionController::class, 'index'])
+    ->name('weight_transactions.index');
+
+// JSON for DataTable
+Route::get('/weight_transactions/datatable', [WeightTransactionController::class, 'datatable'])
+    ->name('weight_transactions.datatable');
 Route::get('/weight_transactions/create', [WeightTransactionController::class, 'create'])->name('weight_transactions.create');
 Route::post('/weight_transactions', [WeightTransactionController::class, 'store'])->name('weight_transactions.store');
 Route::get('/weight_transactions/{id}/edit', [WeightTransactionController::class, 'edit'])->name('weight_transactions.edit');

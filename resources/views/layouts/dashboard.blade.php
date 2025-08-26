@@ -16,27 +16,27 @@
   <link href="{{ asset('assets/css/light-theme.css') }}" rel="stylesheet" />
   <link href="{{ asset('assets/css/semi-dark.css') }}" rel="stylesheet" />
   <link href="{{ asset('assets/css/header-colors.css') }}" rel="stylesheet" />
+  <link href="{{ asset('assets/plugins/datatable/css/dataTables.bootstrap5.min.css') }}" rel="stylesheet" />
+  <link href="{{ asset('assets/css/pace.min.css') }}" rel="stylesheet" />
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   <title>@yield('title','Dashboard')</title>
   @stack('styles')
 </head>
 <body>
-  {{-- 1) wrapper = full-height flex column --}}
   <div class="wrapper d-flex flex-column min-vh-100">
     @include('components.dashboard-header')
     @include('components.dashboard-sidebar')
 
-    {{-- 2) main grows to fill height and is a flex column --}}
-    <main class="page-content d-flex flex-column flex-grow-1">
-      <div class="container mt-4">
+
         @yield('content')
-      </div>
 
-      {{-- 3) footer main-এর ভেতরে, এবং নিচে ঠেলে দিতে mt-auto --}}
+
       @include('components.dashboard-footer')
-    </main>
-  </div>
 
+  </div>
+  <script src="{{ asset('assets/plugins/datatable/js/jquery.dataTables.min.js') }}"></script>
+  <script src="{{ asset('assets/plugins/datatable/js/dataTables.bootstrap5.min.js') }}"></script>
   <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ asset('assets/js/jquery.min.js') }}"></script>
   <script src="{{ asset('assets/plugins/simplebar/js/simplebar.min.js') }}"></script>
