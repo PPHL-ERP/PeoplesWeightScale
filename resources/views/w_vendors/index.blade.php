@@ -5,7 +5,16 @@
   @if(session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
   @endif
-
+<main class="page-content">
+  <div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+    <div class="breadcrumb-title pe-3">Tables</div>
+    <div class="ps-3">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="#"><i class="bx bx-home-alt"></i></a></li>
+        <li class="breadcrumb-item active">Material</li>
+      </ol>
+    </div>
+  </div>
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Vendors</h2>
     <a href="{{ route('w_vendors.create') }}" class="btn btn-success">+ Create</a>
@@ -70,4 +79,5 @@
   </div>
 
   {{ $vendors->links('pagination::bootstrap-5') }}
+  </main>
 @endsection
