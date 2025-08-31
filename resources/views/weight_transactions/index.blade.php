@@ -16,14 +16,13 @@
   <h6 class="mb-0 text-uppercase">Scale Weight INFO</h6>
   <hr/>
 
-  {{-- Filters (6 types + vehicle) --}}
+  {{-- Filters --}}
   <div class="card mb-3">
     <div class="card-body">
       <div class="row g-2">
         <div class="col-md-3">
           <label class="form-label">Global Search</label>
-          <input id="f_search" type="text" class="form-control"
-                 placeholder="Txn/Vehicle/Customer/Vendor/Material/Sector/User">
+          <input id="f_search" type="text" class="form-control" placeholder="Txn/Vehicle/Customer/Vendor/Material/Sector/User">
         </div>
         <div class="col-md-2">
           <label class="form-label">From</label>
@@ -74,68 +73,39 @@
     </div>
   </div>
 
-  {{-- Table --}}
+  {{-- Table (no .table-responsive wrapper) --}}
   <div class="card">
     <div class="card-body">
-      <div class="table-responsive">
-        <table id="weights-table" class="table table-striped table-bordered w-100">
-          <thead>
-          <tr>
-            <th>#</th>
-            <th>Challan No</th>
-            <th>W-Type</th>
-            <th>Transfer</th>
-            <th>Vehicle Type</th>
-            <th>Vehicle No</th>
-            <th>Material</th>
-            <th>Product</th>
-            <th>Gross</th>
-            <th>Tare</th>
-            <th>Net</th>
-            <th>Vol</th>
-            <th>Price</th>
-            <th>Disc</th>
-            <th>Amount</th>
-            <th>Customer</th>
-            <th>Vendor</th>
-            <th>Sector</th>
-            <th>User</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Images</th>
-            <th>Print</th> {{-- NEW --}}
-          </tr>
-          </thead>
-          <tbody></tbody>
-          <tfoot>
-          <tr>
-            <th>#</th>
-            <th>Challan No</th>
-            <th>W-Type</th>
-            <th>Transfer</th>
-            <th>Vehicle Type</th>
-            <th>Vehicle No</th>
-            <th>Material</th>
-            <th>Product</th>
-            <th>Gross</th>
-            <th>Tare</th>
-            <th>Net</th>
-            <th>Vol</th>
-            <th>Price</th>
-            <th>Disc</th>
-            <th>Amount</th>
-            <th>Customer</th>
-            <th>Vendor</th>
-            <th>Sector</th>
-            <th>User</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Images</th>
-            <th>Print</th> {{-- NEW --}}
-          </tr>
-          </tfoot>
-        </table>
-      </div>
+      <table id="weights-table" class="table table-striped table-bordered table-sm w-100">
+        <thead>
+        <tr>
+          <th>#</th>
+          <th>Print</th>
+          <th>Challan No</th>
+          <th>W-Type</th>
+          <th>Transfer</th>
+          <th>V Type</th>
+          <th>Vehicle No</th>
+          <th>Material</th>
+          <th>Product</th>
+          <th>Gross</th>
+          <th>Tare</th>
+          <th>Net</th>
+          <th>Vol</th>
+          <th>Price</th>
+          <th>Disc</th>
+          <th>Amount</th>
+          <th>Customer</th>
+          <th>Vendor</th>
+          <th>Sector</th>
+          <th>User</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Images</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 </main>
@@ -170,9 +140,20 @@
 @push('styles')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 <style>
-  .badge-upper{text-transform:uppercase}
-  .num{text-align:right}
-  .thumb-btn{white-space:nowrap}
+  /* Compact + keep widths equal for header/body */
+  #weights-table { font-size: 12px; }
+  #weights-table.dataTable thead th,
+  #weights-table.dataTable tbody td {
+    padding: 4px 6px !important;
+    white-space: nowrap;
+    box-sizing: border-box; /* IMPORTANT for equal calc */
+    vertical-align: middle;
+  }
+  .badge-upper { text-transform: uppercase }
+  .num { text-align: right }
+  .btn-xxs { padding: .15rem .35rem; font-size: 11px; line-height: 1.2; }
+  /* Force wrapper to allow horizontal scroll controlled by DataTables */
+  div.dataTables_wrapper { width: 100%; }
 </style>
 @endpush
 
@@ -180,13 +161,11 @@
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
-  // ---- helpers ----
   function fmt2(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
   function netKG(g,t,real){const R=Number(real||0);return (R&&R>0)?R.toFixed(2):(Number(g||0)-Number(t||0)).toFixed(2)}
   function fmtDate(v){const d=new Date(v);if(isNaN(d))return v||'';return [String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),d.getFullYear()].join('-')}
   function demoPhotos(){return['https://picsum.photos/id/1011/1200/700','https://picsum.photos/id/1015/1200/700','https://picsum.photos/id/1025/1200/700']}
 
-  // Buildable URLs with placeholder :id (server renders the template, we replace client-side)
   const a4RouteTpl  = "{{ route('print.invoice', ':id') }}";
   const posRouteTpl = "{{ route('print.pos', ':id') }}";
 
@@ -194,7 +173,15 @@
     const table = $('#weights-table').DataTable({
       processing:true,
       pageLength:25,
-      order:[[20,'desc']], // Date column index (0-based)
+      lengthMenu:[25,50,100],
+      // Let DataTables control horizontal width/scroll
+      scrollX:true,
+      scrollCollapse:true,
+      autoWidth:true,
+      responsive:false,
+      // fixedHeader:false avoids width drift on complex tables
+      fixedHeader:false,
+      order:[[21,'desc']], // Date column index
       ajax:{
         url: "{{ route('weight_transactions.datatable') }}",
         data: function(d){
@@ -208,14 +195,23 @@
         }
       },
       columns:[
-        {data:null, orderable:false, searchable:false, render:(d,t,r,m)=>m.row+1},
-        {data:'transaction_id'},
+        {data:null, render:(d,t,r,m)=>m.row+1}, // #
+        {data:null, orderable:false, searchable:false, render:r=>{
+          const a4Url  = a4RouteTpl.replace(':id', r.id);
+          const posUrl = posRouteTpl.replace(':id', r.id);
+          return `
+            <div class="btn-group" role="group">
+              <a href="${a4Url}" target="_blank" class="btn btn-success btn-xxs" title="A4"><i class="bi bi-file-earmark-pdf"></i></a>
+              <a href="${posUrl}" target="_blank" class="btn btn-primary btn-xxs" title="POS"><i class="bi bi-printer"></i></a>
+            </div>`;
+        }},
+        {data:'transaction_id'},      // C No
         {data:'weight_type'},
         {data:'transfer_type'},
-        {data:'vehicle_type'},
+        {data:'vehicle_type', defaultContent:'N/A'},
         {data:'vehicle_no'},
-        {data:'material'},
-        {data:'productType'},
+        {data:'material', defaultContent:'N/A'},
+        {data:'productType', defaultContent:'N/A'},
         {data:'gross_weight', className:'num', render:v=>fmt2(v)},
         {data:'tare_weight',  className:'num', render:v=>fmt2(v)},
         {data:null,           className:'num', render:r=>fmt2(netKG(r.gross_weight,r.tare_weight,r.real_net))},
@@ -225,38 +221,24 @@
         {data:'amount',  className:'num', render:v=>fmt2(v)},
         {data:'customer_name', defaultContent:'N/A'},
         {data:'vendor_name',   defaultContent:'N/A'},
-
-        // Use your sector field here (fix duplicated customer_name)
         {data:'sector_name',   defaultContent:'N/A'},
-
         {data:'username',      defaultContent:'N/A'},
         {data:'status', render:v=>`<span class="badge ${v==='completed'?'bg-success':(v==='cancelled'?'bg-danger':'bg-secondary')} badge-upper">${v||'N/A'}</span>`},
         {data:'created_at', render:v=>fmtDate(v)},
-
-        // Images column
-        {data:null, orderable:false, searchable:false,
-          render:r=>`<button class="btn btn-sm btn-outline-primary thumb-btn view-photos" data-id="${r.id}">
-                       <i class="bi bi-images me-1"></i> View
-                     </button>`},
-
-        // PRINT column (A4 + POS)
-        {data:null, orderable:false, searchable:false,
-          render:r=>{
-            const a4Url  = a4RouteTpl.replace(':id',  r.id);
-            const posUrl = posRouteTpl.replace(':id', r.id);
-            return `
-              <div class="btn-group" role="group">
-                <a href="${a4Url}" target="_blank" class="btn btn-sm btn-success" title="A4 PDF">
-                  <i class="bi bi-file-earmark-pdf"></i> A4 PDF
-                </a>
-                <a href="${posUrl}" target="_blank" class="btn btn-sm btn-primary" title="POS Print">
-                  <i class="bi bi-printer"></i> POS
-                </a>
-              </div>`;
-          }
-        }
-      ]
+        {data:null, orderable:false, searchable:false, render:r=>`<button class="btn btn-outline-primary btn-xxs view-photos" data-id="${r.id}" title="View photos"><i class="bi bi-images"></i></button>`}
+      ],
+      initComplete: function(){
+        // Recalculate widths after the table is visible
+        this.api().columns.adjust();
+      },
+      drawCallback: function(){
+        // Keep things synced on each draw
+        this.api().columns.adjust();
+      }
     });
+
+    // Keep aligned on window resize
+    $(window).on('resize', function(){ table.columns.adjust(); });
 
     // Apply / Reset filters
     $('#btnApply').on('click', ()=> table.ajax.reload());
@@ -276,12 +258,6 @@
          </div>`));
       new bootstrap.Modal(document.getElementById('photoModal')).show();
     });
-
-    // (Optional) POS popup small window instead of new tab:
-    // $(document).on('click', 'a[title="POS Print"]', function(e){
-    //   e.preventDefault();
-    //   window.open($(this).attr('href'), 'poswin', 'width=380,height=600,menubar=0,toolbar=0,location=0,status=0');
-    // });
   });
 </script>
 @endpush
