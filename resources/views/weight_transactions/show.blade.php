@@ -1,6 +1,16 @@
 @extends('layouts.dashboard')
 @section('title','Weight Transaction Details')
 @section('content')
+<main class="page-content">
+  <div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+    <div class="breadcrumb-title pe-3">Tables</div>
+    <div class="ps-3">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="#"><i class="bx bx-home-alt"></i></a></li>
+        <li class="breadcrumb-item active">Material</li>
+      </ol>
+    </div>
+  </div>
 <div class="container">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Transaction Details #{{ $transaction->id }}</h2>
@@ -43,4 +53,5 @@
     </div>
   </div>
 </div>
+</main>
 @endsection

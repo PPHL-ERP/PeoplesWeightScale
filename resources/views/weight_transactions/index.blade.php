@@ -16,7 +16,7 @@
   <h6 class="mb-0 text-uppercase">Scale Weight INFO</h6>
   <hr/>
 
-  {{-- Filters (6 types) --}}
+  {{-- Filters (6 types + vehicle) --}}
   <div class="card mb-3">
     <div class="card-body">
       <div class="row g-2">
@@ -66,7 +66,9 @@
 
         <div class="col-md-3 d-flex align-items-end gap-2">
           <button id="btnApply" class="btn btn-primary w-100"><i class="bi bi-funnel me-1"></i>Apply</button>
-          <button id="btnReset" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i></button>
+          <button id="btnReset" class="btn btn-outline-secondary" title="Reset filters">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -101,6 +103,7 @@
             <th>Status</th>
             <th>Date</th>
             <th>Images</th>
+            <th>Print</th> {{-- NEW --}}
           </tr>
           </thead>
           <tbody></tbody>
@@ -128,6 +131,7 @@
             <th>Status</th>
             <th>Date</th>
             <th>Images</th>
+            <th>Print</th> {{-- NEW --}}
           </tr>
           </tfoot>
         </table>
@@ -165,25 +169,34 @@
 
 @push('styles')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
-<style>.badge-upper{text-transform:uppercase}.num{text-align:right}.thumb-btn{white-space:nowrap}</style>
+<style>
+  .badge-upper{text-transform:uppercase}
+  .num{text-align:right}
+  .thumb-btn{white-space:nowrap}
+</style>
 @endpush
 
 @push('scripts')
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
+  // ---- helpers ----
   function fmt2(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
   function netKG(g,t,real){const R=Number(real||0);return (R&&R>0)?R.toFixed(2):(Number(g||0)-Number(t||0)).toFixed(2)}
-  function fmtDate(v){const d=new Date(v);return [String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),d.getFullYear()].join('-')}
+  function fmtDate(v){const d=new Date(v);if(isNaN(d))return v||'';return [String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),d.getFullYear()].join('-')}
   function demoPhotos(){return['https://picsum.photos/id/1011/1200/700','https://picsum.photos/id/1015/1200/700','https://picsum.photos/id/1025/1200/700']}
+
+  // Buildable URLs with placeholder :id (server renders the template, we replace client-side)
+  const a4RouteTpl  = "{{ route('print.invoice', ':id') }}";
+  const posRouteTpl = "{{ route('print.pos', ':id') }}";
 
   $(function(){
     const table = $('#weights-table').DataTable({
       processing:true,
       pageLength:25,
-      order:[[20,'desc']], // Date
+      order:[[20,'desc']], // Date column index (0-based)
       ajax:{
-        url: '{{ route('weight_transactions.datatable') }}',
+        url: "{{ route('weight_transactions.datatable') }}",
         data: function(d){
           d.search_text   = $('#f_search').val();
           d.from_date     = $('#f_from').val();
@@ -212,17 +225,40 @@
         {data:'amount',  className:'num', render:v=>fmt2(v)},
         {data:'customer_name', defaultContent:'N/A'},
         {data:'vendor_name',   defaultContent:'N/A'},
-        {data:'customer_name',   defaultContent:'N/A'},
+
+        // Use your sector field here (fix duplicated customer_name)
+        {data:'sector_name',   defaultContent:'N/A'},
+
         {data:'username',      defaultContent:'N/A'},
-        {data:'status', render:v=>`<span class="badge ${v==='completed'?'bg-success':'bg-secondary'} badge-upper">${v||'N/A'}</span>`},
+        {data:'status', render:v=>`<span class="badge ${v==='completed'?'bg-success':(v==='cancelled'?'bg-danger':'bg-secondary')} badge-upper">${v||'N/A'}</span>`},
         {data:'created_at', render:v=>fmtDate(v)},
+
+        // Images column
         {data:null, orderable:false, searchable:false,
           render:r=>`<button class="btn btn-sm btn-outline-primary thumb-btn view-photos" data-id="${r.id}">
                        <i class="bi bi-images me-1"></i> View
-                     </button>`}
+                     </button>`},
+
+        // PRINT column (A4 + POS)
+        {data:null, orderable:false, searchable:false,
+          render:r=>{
+            const a4Url  = a4RouteTpl.replace(':id',  r.id);
+            const posUrl = posRouteTpl.replace(':id', r.id);
+            return `
+              <div class="btn-group" role="group">
+                <a href="${a4Url}" target="_blank" class="btn btn-sm btn-success" title="A4 PDF">
+                  <i class="bi bi-file-earmark-pdf"></i> A4 PDF
+                </a>
+                <a href="${posUrl}" target="_blank" class="btn btn-sm btn-primary" title="POS Print">
+                  <i class="bi bi-printer"></i> POS
+                </a>
+              </div>`;
+          }
+        }
       ]
     });
 
+    // Apply / Reset filters
     $('#btnApply').on('click', ()=> table.ajax.reload());
     $('#btnReset').on('click', ()=>{
       $('#f_search,#f_vehicle_no').val('');
@@ -231,7 +267,7 @@
       table.ajax.reload();
     });
 
-    // demo photo modal
+    // Demo photo modal
     $(document).on('click','.view-photos', function(){
       const inner = $('#photoCarouselInner').empty();
       demoPhotos().forEach((src,i)=> inner.append(
@@ -240,6 +276,12 @@
          </div>`));
       new bootstrap.Modal(document.getElementById('photoModal')).show();
     });
+
+    // (Optional) POS popup small window instead of new tab:
+    // $(document).on('click', 'a[title="POS Print"]', function(e){
+    //   e.preventDefault();
+    //   window.open($(this).attr('href'), 'poswin', 'width=380,height=600,menubar=0,toolbar=0,location=0,status=0');
+    // });
   });
 </script>
 @endpush

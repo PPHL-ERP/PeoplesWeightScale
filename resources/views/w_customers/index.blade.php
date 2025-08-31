@@ -77,5 +77,5 @@
   </div>
 
   {{ $customers->links('pagination::bootstrap-5') }}
-  </main>
+</main>
 @endsection
