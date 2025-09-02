@@ -82,6 +82,7 @@ use App\Http\Controllers\Api\{
     WVendorController
 
 };
+use App\Http\Controllers\Api\ImageUploadController;
 use App\Http\Controllers\Api\Chicks\BreedController;
 use App\Http\Controllers\Api\Chicks\ChicksBookingController;
 use App\Http\Controllers\Api\Chicks\ChicksDailyPriceController;
@@ -123,6 +124,9 @@ use App\Services\SalesEmployeeSyncService;
     /////////////////////////////////////Weight Scale Route //////////////
 // 📝 Create (store)
 Route::post('/storeweight-transactions', [WeightTransactionController::class, 'store']);
+
+// Image upload from camera (one POST per camera)
+Route::post('/v1/images/upload', [ImageUploadController::class, 'upload']);
 
 // 📋 Read all (index)
 Route::get('/getweight-transactions', [WeightTransactionController::class, 'index']);
