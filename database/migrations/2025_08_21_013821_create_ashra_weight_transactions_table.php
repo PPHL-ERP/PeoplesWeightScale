@@ -49,6 +49,7 @@ return new class extends Migration
             $table->text('others')->nullable();
             $table->string('username')->nullable();
             $table->string('status')->nullable(); // e.g., Unfinished, Finished, Reject
+            $table->string('detection')->nullable();
 
             $table->timestamps();
         });

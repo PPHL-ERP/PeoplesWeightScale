@@ -4,10 +4,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-
+use Illuminate\Support\Facades\DB;
 use App\Models\WeightTransaction;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 class WeightTransactionController extends Controller
 {
 
@@ -115,7 +116,7 @@ class WeightTransactionController extends Controller
     }
 
 
-    public function store(Request $request)
+    public function storeold(Request $request)
     {
         $validated = $request->validate([
             'transaction_id'     => 'nullable|string',
@@ -183,6 +184,147 @@ class WeightTransactionController extends Controller
         ], 201);
     }
 
+    public function store(Request $request)
+        {
+            // ---- Correlation ID for tracing this request in logs ----
+            $rid = (string) Str::uuid();
+            Log::withContext(['rid' => $rid]);
+
+            // ---- Build files meta (name/size/mime) safely ----
+            $filesMeta = [];
+            try {
+                foreach ($request->allFiles() as $key => $fileOrArray) {
+                    if (is_array($fileOrArray)) {
+                        foreach ($fileOrArray as $file) {
+                            $filesMeta[] = [
+                                'field' => $key,
+                                'name'  => $file->getClientOriginalName(),
+                                'size'  => $file->getSize(),
+                                'mime'  => $file->getMimeType(),
+                            ];
+                        }
+                    } else {
+                        $file = $fileOrArray;
+                        $filesMeta[] = [
+                            'field' => $key,
+                            'name'  => $file->getClientOriginalName(),
+                            'size'  => $file->getSize(),
+                            'mime'  => $file->getMimeType(),
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $filesMeta = ['error' => $e->getMessage()];
+            }
+
+            // ---- Raw body (cap to avoid huge logs) ----
+            $rawBody = $request->getContent();
+            if (mb_strlen($rawBody) > 20000) {
+                $rawBody = mb_substr($rawBody, 0, 20000) . '...[truncated]';
+            }
+
+            // ---- Choose a log channel: 'requests' (if defined) else default ----
+            $logChannel = config('logging.channels.requests') ? 'requests' : config('logging.default', 'stack');
+
+            // ---- Log everything about the request ----
+            Log::channel($logChannel)->info('WeightTransaction.store: incoming request', [
+                'url'     => $request->fullUrl(),
+                'method'  => $request->method(),
+                'ip'      => $request->ip(),
+                'user_id' => optional($request->user())->id,
+                'headers' => $request->headers->all(),
+                'query'   => $request->query(),
+                'input'   => $request->except(['password','password_confirmation','token','authorization']),
+                'json'    => $request->isJson() ? $request->json()->all() : null,
+                'files'   => $filesMeta,
+                'raw'     => $rawBody,
+            ]);
+
+            // ---- Fast store (no validation, Query Builder insert) ----
+            $data = $request->only([
+                'transaction_id',
+                'weight_type',
+                'transfer_type',
+                'select_mode',
+                'vehicle_type',
+                'vehicle_no',
+                'material',
+                'productType',
+                'gross_weight',
+                'gross_time',
+                'gross_operator',
+                'tare_weight',
+                'tare_time',
+                'tare_operator',
+                'volume',
+                'price',
+                'discount',
+                'customer_id',
+                'vendor_id',
+                'sale_id',
+                'purchase_id',
+                'sector_id',
+                'note',
+                'others',
+                'username',
+                'status',
+                'detection', // <-- new column
+            ]);
+
+            // Computed fields
+            $gross    = (float)($data['gross_weight'] ?? 0);
+            $tare     = (float)($data['tare_weight'] ?? 0);
+            $net      = $gross - $tare;
+            $price    = (float)($data['price'] ?? 0);
+            $amount   = $net * $price;
+            $discount = (float)($data['discount'] ?? 0);
+            $realNet  = $amount - $discount;
+
+            $data['amount']   = $amount;
+            $data['real_net'] = $realNet;
+
+            // Lightweight lookups (names)
+            if (!empty($data['customer_id'])) {
+                $c = DB::table('w_customer')->select('cName')->where('id', $data['customer_id'])->first();
+                $data['customer_name'] = $c->cName ?? null;
+            }
+            if (!empty($data['sector_id'])) {
+                $s = DB::table('sectors')->select('name')->where('id', $data['sector_id'])->first();
+                $data['sector_name'] = $s->name ?? null;
+            }
+            // NOTE: vendor_name column does not exist in your migration, so we skip it.
+
+            $now = now();
+            $data['created_at'] = $now;
+            $data['updated_at'] = $now;
+
+            try {
+                $id = DB::table('weight_transactions')->insertGetId($data);
+                $transaction = WeightTransaction::find($id);
+
+                Log::channel($logChannel)->info('WeightTransaction.store: created', [
+                    'id'              => $id,
+                    'transaction_id'  => $transaction->transaction_id ?? null,
+                ]);
+
+                return response()->json([
+                    'message' => 'Transaction created successfully.',
+                    'data'    => $transaction,
+                    'rid'     => $rid,
+                ], 201);
+            } catch (\Throwable $e) {
+                Log::channel($logChannel)->error('WeightTransaction.store: insert failed', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Failed to create transaction.',
+                    'error'   => $e->getMessage(),
+                    'rid'     => $rid,
+                ], 500);
+            }
+    }
 
     // ✅ Show one
     public function show($id)
