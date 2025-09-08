@@ -33,8 +33,9 @@ class ImageUploadController extends Controller
             return response()->json(['message' => 'capture_datetime or capture_date+capture_time required'], 400);
         }
 
-        $transactionId = $data['transaction_id'];
-        $cameraNo = $data['camera_no'];
+    $weighingId = $data['weighing_id'] ?? null;
+    $transactionId = $data['transaction_id'] ?? null;
+    $cameraNo = $data['camera_no'];
 
         // decode base64
         $b64 = $data['image_base64'];
@@ -62,13 +63,32 @@ class ImageUploadController extends Controller
             return response()->json(['message' => 'Unsupported image type: ' . $contentType], 400);
         }
 
-        $checksum = $data['checksum'] ?? hash('sha256', $bytes);
+        $checksum = $data['checksum'] ?? null;
+        if (!$checksum) {
+            $logger->warning('upload.missing_checksum', $baseCtx);
+            return response()->json(['status' => 'error', 'error' => 'missing_checksum', 'message' => 'checksum is required'], 400);
+        }
 
-        // idempotency: check existing by txn+cam+time
-        $existing = TransactionImage::where('transaction_id', $transactionId)
-            ->where('camera_no', $cameraNo)
-            ->where('captured_at', $capturedAt)
-            ->first();
+        // verify checksum matches raw bytes
+        $computed = hash('sha256', $bytes);
+        if (!hash_equals($computed, $checksum)) {
+            $logger->warning('upload.checksum_mismatch', $baseCtx + ['provided_prefix' => substr($checksum,0,12), 'computed_prefix'=>substr($computed,0,12)]);
+            return response()->json(['status' => 'error', 'error' => 'checksum_mismatch', 'message' => 'checksum does not match image bytes'], 400);
+        }
+
+        // idempotency/deduplication: prefer (weighing_id, checksum) uniqueness if weighing_id supplied
+        if ($weighingId) {
+            $existing = TransactionImage::where('weighing_id', $weighingId)
+                ->where('checksum_sha256', $checksum)
+                ->first();
+        } elseif ($transactionId) {
+            $existing = TransactionImage::where('transaction_id', $transactionId)
+                ->where('checksum_sha256', $checksum)
+                ->first();
+        } else {
+            // fallback global checksum check
+            $existing = TransactionImage::where('checksum_sha256', $checksum)->first();
+        }
         if ($existing) {
             return response()->json([
                 'id' => $existing->id,
@@ -78,7 +98,7 @@ class ImageUploadController extends Controller
 
         // save bytes via service
         try {
-            $meta = $this->storageService->saveBytes($bytes, $transactionId, $cameraNo, $capturedAt, $contentType);
+            $meta = $this->storageService->saveBytes($bytes, $transactionId ?? ($weighingId? (string)$weighingId : 'unknown'), $cameraNo, $capturedAt, $contentType, $checksum);
         } catch (\Exception $e) {
             Log::error('Image save failed: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to save image'], 500);
@@ -213,8 +233,13 @@ class ImageUploadController extends Controller
             $durationMs = (int) round((microtime(true) - $t0) * 1000);
             $logger->info('upload.done', $baseCtx + ['status' => 200, 'duration_ms' => $durationMs]);
             return response()->json([
-                'id'         => $existing->id,
-                'image_path' => $existing->image_path
+                'status' => 'success',
+                'image_id' => $existing->id,
+                'weighing_id' => $existing->weighing_id,
+                'transaction_id' => $existing->transaction_id,
+                'url' => Storage::disk('public')->url($existing->image_path),
+                'checksum' => $existing->checksum_sha256,
+                'already_exists' => true
             ], 200);
         }
 
@@ -235,8 +260,19 @@ class ImageUploadController extends Controller
             return response()->json(['message' => 'Failed to save image'], 500);
         }
 
-        // insert DB record
+        // determine association state: link to weighing if exists, else store pending
+        $weighingExists = false;
+        if ($weighingId) {
+            // check existence of weighing record (use WeightTransaction model)
+            try {
+                $weighingExists = (bool) \App\Models\WeightTransaction::find($weighingId);
+            } catch (\Throwable $e) {
+                $weighingExists = false;
+            }
+        }
+
         $rec = TransactionImage::create([
+            'weighing_id'      => $weighingId,
             'transaction_id'   => $transactionId,
             'camera_no'        => $cameraNo,
             'captured_at'      => $capturedAt,
@@ -245,7 +281,8 @@ class ImageUploadController extends Controller
             'content_type'     => $meta['content_type'],
             'size_bytes'       => $meta['size'],
             'checksum_sha256'  => $meta['checksum'],
-            'ingest_status'    => 'stored'
+            'ingest_status'    => $weighingExists ? 'linked' : 'pending',
+            'extra_meta'       => $data['metadata'] ?? null,
         ]);
         $logger->info('upload.db_created', $baseCtx + [
             'record_id'  => $rec->id,
@@ -256,11 +293,25 @@ class ImageUploadController extends Controller
         $durationMs = (int) round((microtime(true) - $t0) * 1000);
         $logger->info('upload.done', $baseCtx + ['status' => 201, 'duration_ms' => $durationMs]);
 
+        if ($weighingExists) {
+            return response()->json([
+                'status' => 'success',
+                'image_id' => $rec->id,
+                'weighing_id' => $weighingId,
+                'transaction_id' => $transactionId,
+                'url' => $url,
+                'checksum' => $rec->checksum_sha256,
+                'already_exists' => false
+            ], 201);
+        }
+
         return response()->json([
-            'id'         => $rec->id,
-            'image_path' => $meta['path'],
-            'url'        => $url
-        ], 201);
+            'status' => 'accepted',
+            'image_id' => $rec->id,
+            'weighing_id' => null,
+            'transaction_id' => $transactionId,
+            'info' => 'Saved; weighing not found. Will link when weighing record becomes available.'
+        ], 202);
 
     } catch (\Throwable $e) {
         $durationMs = (int) round((microtime(true) - $t0) * 1000);

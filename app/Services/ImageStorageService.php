@@ -19,47 +19,57 @@ class ImageStorageService
      * @param string|null $contentType
      * @return array
      */
-    public function saveBytes(string $bytes, string $transactionId, string $cameraNo, \DateTimeInterface $capturedAt, ?string $contentType = null): array
+    public function saveBytes(string $bytes, string $transactionId, string $cameraNo, \DateTimeInterface $capturedAt, ?string $contentType = null, ?string $origChecksum = null): array
     {
         $date = Carbon::instance($capturedAt)->format('Y-m-d');
-        $checksum = hash('sha256', $bytes);
-        $ext = 'png';
-        if ($contentType === 'image/jpeg') {
-            $ext = 'jpg';
+        if (!$origChecksum) {
+            $origChecksum = hash('sha256', $bytes);
         }
 
-        // generate filename
-        $filename = sprintf('%s_%s_%s_%s.%s', $transactionId, $cameraNo, $capturedAt->format('His_u'), substr($checksum, 0, 8), $ext);
-        $path = "images/{$date}/{$transactionId}/{$filename}";
+        // Base filename (without extension)
+        $baseName = sprintf('%s_%s_%s_%s', $transactionId, $cameraNo, $capturedAt->format('His_u'), substr($origChecksum, 0, 8));
 
-        // ensure directory
-        Storage::disk('public')->put($path, $bytes);
-        $size = Storage::disk('public')->size($path);
-
-        // attempt webp conversion if Intervention available and GD supports webp
-        // do NOT overwrite original; store alongside
+        // Prefer storing a webp - encode using Intervention Image and write webp only.
         try {
-            if (extension_loaded('gd') || extension_loaded('imagick')) {
-                $webpName = preg_replace('/\.[^.]+$/', '.webp', $filename);
-                $webpPath = "images/{$date}/{$transactionId}/{$webpName}";
-                $img = Image::make($bytes);
-                // you can set quality via config
-                $img->encode('webp', 80);
-                Storage::disk('public')->put($webpPath, (string)$img);
-            } else {
-                $webpPath = null;
-            }
-        } catch (\Exception $e) {
-            // conversion failed; ignore and continue
-            $webpPath = null;
-        }
+            $img = Image::make($bytes);
+            // encode to webp with reasonable default quality (configurable later)
+            $webpContents = (string) $img->encode('webp', 80);
 
-        return [
-            'path' => $path,
-            'webp_path' => $webpPath,
-            'size' => $size,
-            'checksum' => $checksum,
-            'content_type' => $contentType ?? 'image/png'
-        ];
+            $webpName = $baseName . '.webp';
+            $webpPath = "images/{$date}/{$transactionId}/{$webpName}";
+
+            Storage::disk('public')->put($webpPath, $webpContents);
+            $size = Storage::disk('public')->size($webpPath);
+
+            return [
+                'path' => $webpPath,
+                'webp_path' => $webpPath,
+                'size' => $size,
+                'checksum' => $origChecksum, // return checksum of original bytes for dedup
+                'content_type' => 'image/webp'
+            ];
+        } catch (\Exception $e) {
+            // Conversion failed: fall back to storing original bytes to avoid losing the upload.
+            // This branch returns the original file path and signals that webp conversion failed.
+            $ext = 'png';
+            if ($contentType === 'image/jpeg') {
+                $ext = 'jpg';
+            }
+
+            $origName = $baseName . '.' . $ext;
+            $origPath = "images/{$date}/{$transactionId}/{$origName}";
+
+            Storage::disk('public')->put($origPath, $bytes);
+            $size = Storage::disk('public')->size($origPath);
+
+            return [
+                'path' => $origPath,
+                'webp_path' => null,
+                'size' => $size,
+                'checksum' => $origChecksum,
+                'content_type' => $contentType ?? 'application/octet-stream',
+                'warning' => 'webp_conversion_failed'
+            ];
+        }
     }
 }

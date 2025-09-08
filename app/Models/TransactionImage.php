@@ -12,6 +12,7 @@ class TransactionImage extends Model
     protected $table = 'transaction_images';
 
     protected $fillable = [
+    'weighing_id',
         'transaction_id',
         'camera_no',
         'captured_at',

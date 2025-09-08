@@ -15,23 +15,25 @@ class UploadImageRequest extends FormRequest
     public function rules()
     {
         return [
-            'transaction_id' => 'required|string|max:128',
+            'weighing_id' => 'nullable|integer',
+            'transaction_id' => 'nullable|string|max:128',
             'camera_no' => 'required|string|max:16',
             'capture_datetime' => 'nullable|date',
             'capture_date' => 'nullable|date',
             'capture_time' => 'nullable|string',
             'image_base64' => 'required|string',
-            'content_type' => 'nullable|string',
-            'checksum' => 'nullable|string'
+            'content_type' => 'required|string|in:image/png,image/jpeg',
+            'checksum' => 'required|string|size:64',
+            'metadata' => 'nullable|array'
         ];
     }
 
     public function messages()
     {
         return [
-            'transaction_id.required' => 'transaction_id is required',
             'camera_no.required' => 'camera_no is required',
             'image_base64.required' => 'image_base64 is required',
+            'checksum.required' => 'checksum is required and must be sha256 hex of raw bytes',
         ];
     }
 }
