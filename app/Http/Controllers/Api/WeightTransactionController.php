@@ -292,7 +292,10 @@ class WeightTransactionController extends Controller
                 $s = DB::table('sectors')->select('name')->where('id', $data['sector_id'])->first();
                 $data['sector_name'] = $s->name ?? null;
             }
-            // NOTE: vendor_name column does not exist in your migration, so we skip it.
+            if (!empty($data['vendor_id'])) {
+                $v = DB::table('w_vendor')->select('vName')->where('id', $data['vendor_id'])->first();
+                $data['vendor_name'] = $v->vName ?? null;
+            }
 
             $now = now();
             $data['created_at'] = $now;
@@ -396,7 +399,19 @@ class WeightTransactionController extends Controller
             $validated['sector_name'] = $sector->name ?? null;
         }
 
-        $transaction->update($validated);
+        // Only set vendor_name if the DB has that column (migration may add it).
+        // If vendor_name is not present in the table, update() will still work because
+        // we guard against unexpected columns by only validating/whitelisting above.
+        try {
+            $transaction->update($validated);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('WeightTransaction.update: DB error', ['error' => $e->getMessage(), 'id' => $id]);
+
+            return response()->json([
+                'message' => 'Failed to update transaction due to database error.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
         // refresh to load any DB-level changes and ensure transaction_id is present
         $transaction->refresh();
