@@ -398,6 +398,9 @@ class WeightTransactionController extends Controller
 
         $transaction->update($validated);
 
+        // refresh to load any DB-level changes and ensure transaction_id is present
+        $transaction->refresh();
+
         return response()->json([
             'message' => 'Transaction updated successfully.',
             'data'    => $transaction,

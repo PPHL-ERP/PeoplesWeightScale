@@ -98,7 +98,9 @@ class ImageUploadController extends Controller
 
         // save bytes via service
         try {
-            $meta = $this->storageService->saveBytes($bytes, $transactionId ?? ($weighingId? (string)$weighingId : 'unknown'), $cameraNo, $capturedAt, $contentType, $checksum);
+            $identity = $weighingId ? (string)$weighingId : ($transactionId ?? 'unknown');
+            $mode = $data['mode'] ?? null;
+            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, $checksum, $mode);
         } catch (\Exception $e) {
             Log::error('Image save failed: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to save image'], 500);
@@ -246,7 +248,9 @@ class ImageUploadController extends Controller
         // save bytes via service
         try {
             $logger->debug('upload.storage_save_attempt', $baseCtx);
-            $meta = $this->storageService->saveBytes($bytes, $transactionId, $cameraNo, $capturedAt, $contentType);
+            $identity = $transactionId ?? 'unknown';
+            $mode = $data['mode'] ?? null;
+            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, null, $mode);
             $logger->info('upload.storage_saved', $baseCtx + [
                 'path'         => $meta['path'] ?? null,
                 'size'         => $meta['size'] ?? null,
