@@ -17,14 +17,16 @@ class UploadImageRequest extends FormRequest
         return [
             'weighing_id' => 'nullable|integer',
             'transaction_id' => 'nullable|string|max:128',
+            'sector_id' => 'nullable|integer',
             'mode' => 'nullable|string|in:gross,tare',
             'camera_no' => 'required|string|max:16',
             'capture_datetime' => 'nullable|date',
             'capture_date' => 'nullable|date',
             'capture_time' => 'nullable|string',
-            'image_base64' => 'required|string',
-            'content_type' => 'required|string|in:image/png,image/jpeg',
-            'checksum' => 'required|string|size:64',
+            'image_base64' => 'required_without:image_file|string',
+            'image_file' => 'nullable|file|mimes:png,jpeg|sometimes|max:5120',
+            'content_type' => 'nullable|string|in:image/png,image/jpeg',
+            'checksum' => 'nullable|string|size:64',
             'metadata' => 'nullable|array'
         ];
     }

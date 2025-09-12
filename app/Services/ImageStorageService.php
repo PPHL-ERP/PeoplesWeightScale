@@ -19,34 +19,70 @@ class ImageStorageService
      * @param string|null $contentType
      * @return array
      */
-    public function saveBytes(string $bytes, string $identity, string $cameraNo, \DateTimeInterface $capturedAt, ?string $contentType = null, ?string $origChecksum = null, ?string $mode = null): array
+    public function saveBytes(string $bytes, string $identity, string $cameraNo, \DateTimeInterface $capturedAt, ?string $contentType = null, ?string $origChecksum = null, ?string $mode = null, ?int $sectorId = null): array
     {
         $date = Carbon::instance($capturedAt)->format('Y-m-d');
         if (!$origChecksum) {
             $origChecksum = hash('sha256', $bytes);
         }
-        // Always convert to webp and save as .webp per frontend requirement
+        // Decide segment (sector-first). If sectorId provided use it, otherwise use identity (weighing_id or transaction_id)
+        $segment = $sectorId ? (string)$sectorId : (string)$identity;
         $modePart = $mode ? ($mode . '_') : '';
-        $fileName = sprintf('%s_%s%s.webp', $identity, $modePart, $cameraNo);
-        $path = "pictures/{$date}/{$identity}/{$fileName}";
+        // Use PNG by default to match frontend; keep extension .png
+        $fileName = sprintf('%s_%s%s.png', $identity, $modePart, $cameraNo);
+        $path = "pictures/{$date}/{$segment}/{$fileName}";
+
+        // Ensure directory exists for local disk: Storage::disk('public') maps to storage/app/public
+        $disk = Storage::disk('public');
+
+        // Determine whether to save raw PNG or convert to webp (configurable)
+        $convertToWebp = config('image.convert_to_webp', false);
 
         try {
-            $img = Image::make($bytes);
-            // encode to webp with default quality (80)
-            $webpContents = (string) $img->encode('webp', 80);
+            if ($convertToWebp) {
+                $img = Image::make($bytes);
+                $contents = (string) $img->encode('webp', 80);
+                $contentTypeSaved = 'image/webp';
+                // adjust filename for webp if converting
+                $fileName = preg_replace('/\.png$/', '.webp', $fileName);
+                $path = "pictures/{$date}/{$segment}/{$fileName}";
+            } else {
+                // store original bytes as PNG
+                $contents = $bytes;
+                $contentTypeSaved = $contentType ?? 'image/png';
+            }
 
-            Storage::disk('public')->put($path, $webpContents);
-            $size = Storage::disk('public')->size($path);
+            // Atomic write for local disk: write to a temp path then move
+            $tempPath = $path . '.tmp';
+            $fullTemp = storage_path('app/public/' . $tempPath);
+            $fullFinal = storage_path('app/public/' . $path);
+
+            // Ensure directory exists
+            $dir = dirname($fullFinal);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+
+            // write temp file
+            file_put_contents($fullTemp, $contents);
+            // flush to disk
+            if (function_exists('fflush')) {
+                // not required; keep simple
+            }
+            // atomic replace
+            rename($fullTemp, $fullFinal);
+
+            // Use Storage to report size
+            $size = filesize($fullFinal);
 
             return [
                 'path' => $path,
                 'size' => $size,
                 'checksum' => $origChecksum,
-                'content_type' => 'image/webp'
+                'content_type' => $contentTypeSaved
             ];
         } catch (\Exception $e) {
-            // fail hard so caller returns 500 and frontend can retry
-            throw new \Exception('webp_conversion_failed: ' . $e->getMessage());
+            throw new \Exception('image_store_failed: ' . $e->getMessage());
         }
     }
 }

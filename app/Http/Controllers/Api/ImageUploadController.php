@@ -156,7 +156,7 @@ class ImageUploadController extends Controller
     ]);
 
     try {
-        $data = $request->validated();
+    $data = $request->validated();
 
         // parse captured datetime
         if (!empty($data['capture_datetime'])) {
@@ -173,23 +173,36 @@ class ImageUploadController extends Controller
 
         $transactionId = $data['transaction_id'];
         $cameraNo = $data['camera_no'];
+        $sectorId = $data['sector_id'] ?? null;
 
-        // decode base64 (never log raw bytes)
-        $b64 = $data['image_base64'];
-        $hadDataPrefix = false;
-        if (preg_match('/^data:(.*);base64,/', $b64)) {
-            $hadDataPrefix = true;
-            $b64 = substr($b64, strpos($b64, ',') + 1);
-        }
-        $logger->debug('upload.base64_received', $baseCtx + [
-            'had_data_url_prefix' => $hadDataPrefix,
-            'base64_length'       => strlen($data['image_base64']),
-        ]);
+        // Support multipart file upload if present, otherwise expect base64
+        if ($request->hasFile('image_file')) {
+            $file = $request->file('image_file');
+            $bytes = file_get_contents($file->getRealPath());
+            $contentType = $file->getClientMimeType() ?: $contentType ?? 'image/png';
+            $logger->debug('upload.multipart_received', $baseCtx + [
+                'client_filename' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'content_type' => $contentType,
+            ]);
+        } else {
+            // decode base64 (never log raw bytes)
+            $b64 = $data['image_base64'];
+            $hadDataPrefix = false;
+            if (preg_match('/^data:(.*);base64,/', $b64)) {
+                $hadDataPrefix = true;
+                $b64 = substr($b64, strpos($b64, ',') + 1);
+            }
+            $logger->debug('upload.base64_received', $baseCtx + [
+                'had_data_url_prefix' => $hadDataPrefix,
+                'base64_length'       => strlen($data['image_base64']),
+            ]);
 
-        $bytes = base64_decode($b64, true);
-        if ($bytes === false) {
-            $logger->warning('upload.invalid_base64', $baseCtx);
-            return response()->json(['message' => 'Invalid base64 image'], 400);
+            $bytes = base64_decode($b64, true);
+            if ($bytes === false) {
+                $logger->warning('upload.invalid_base64', $baseCtx);
+                return response()->json(['message' => 'Invalid base64 image'], 400);
+            }
         }
 
         $size = strlen($bytes);
@@ -273,7 +286,8 @@ class ImageUploadController extends Controller
         try {
             $logger->debug('upload.storage_save_attempt', $baseCtx);
             $identity = $weighingId ? (string)$weighingId : ($transactionId ?? 'unknown');
-            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, null, $mode);
+            // pass sector id to storage service for sector-first layout
+            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, null, $mode, $sectorId);
             $logger->info('upload.storage_saved', $baseCtx + [
                 'path'         => $meta['path'] ?? null,
                 'size'         => $meta['size'] ?? null,
