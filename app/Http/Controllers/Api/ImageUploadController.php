@@ -22,7 +22,9 @@ class ImageUploadController extends Controller
 
     public function uploadold(UploadImageRequest $request): JsonResponse
     {
-        $data = $request->validated();
+    $data = $request->validated();
+    $weighingId = $data['weighing_id'] ?? null;
+    $mode = $data['mode'] ?? null;
 
         // parse captured datetime
         if (!empty($data['capture_datetime'])) {
@@ -216,16 +218,34 @@ class ImageUploadController extends Controller
             return response()->json(['message' => 'Unsupported image type: ' . $contentType], 400);
         }
 
-        $checksum = $data['checksum'] ?? hash('sha256', $bytes);
+        $checksum = $data['checksum'] ?? null;
+        // compute actual checksum and verify if provided
+        $computedChecksum = hash('sha256', $bytes);
+        if ($checksum) {
+            if (!hash_equals($computedChecksum, $checksum)) {
+                $logger->warning('upload.checksum_mismatch_post', $baseCtx + ['provided' => substr($checksum,0,12), 'computed' => substr($computedChecksum,0,12)]);
+                return response()->json(['error' => 'checksum_mismatch'], 400);
+            }
+        } else {
+            $checksum = $computedChecksum;
+        }
         $logger->debug('upload.checksum_ready', $baseCtx + [
             'checksum_sha256_prefix' => substr($checksum, 0, 12),
         ]);
 
         // idempotency: check existing by txn+cam+time
-        $existing = TransactionImage::where('transaction_id', $transactionId)
-            ->where('camera_no', $cameraNo)
-            ->where('captured_at', $capturedAt)
-            ->first();
+        // Primary dedup by (weighing_id, checksum)
+        if ($weighingId) {
+            $existing = TransactionImage::where('weighing_id', $weighingId)
+                ->where('checksum_sha256', $checksum)
+                ->first();
+        } elseif ($transactionId) {
+            $existing = TransactionImage::where('transaction_id', $transactionId)
+                ->where('checksum_sha256', $checksum)
+                ->first();
+        } else {
+            $existing = TransactionImage::where('checksum_sha256', $checksum)->first();
+        }
 
         if ($existing) {
             $logger->info('upload.idempotent_hit', $baseCtx + [
@@ -234,22 +254,25 @@ class ImageUploadController extends Controller
             ]);
             $durationMs = (int) round((microtime(true) - $t0) * 1000);
             $logger->info('upload.done', $baseCtx + ['status' => 200, 'duration_ms' => $durationMs]);
-            return response()->json([
-                'status' => 'success',
-                'image_id' => $existing->id,
+
+            $resp = [
+                'id' => $existing->id,
                 'weighing_id' => $existing->weighing_id,
                 'transaction_id' => $existing->transaction_id,
                 'url' => Storage::disk('public')->url($existing->image_path),
                 'checksum' => $existing->checksum_sha256,
-                'already_exists' => true
+            ];
+
+            return response()->json([
+                'status' => 'exists',
+                'data' => $resp
             ], 200);
         }
 
         // save bytes via service
         try {
             $logger->debug('upload.storage_save_attempt', $baseCtx);
-            $identity = $transactionId ?? 'unknown';
-            $mode = $data['mode'] ?? null;
+            $identity = $weighingId ? (string)$weighingId : ($transactionId ?? 'unknown');
             $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, null, $mode);
             $logger->info('upload.storage_saved', $baseCtx + [
                 'path'         => $meta['path'] ?? null,
@@ -275,16 +298,18 @@ class ImageUploadController extends Controller
             }
         }
 
+        // create DB record including mode
         $rec = TransactionImage::create([
             'weighing_id'      => $weighingId,
             'transaction_id'   => $transactionId,
+            'mode'             => $mode,
             'camera_no'        => $cameraNo,
             'captured_at'      => $capturedAt,
             'image_path'       => $meta['path'],
             'storage_backend'  => 'local',
             'content_type'     => $meta['content_type'],
             'size_bytes'       => $meta['size'],
-            'checksum_sha256'  => $meta['checksum'],
+            'checksum_sha256'  => $checksum,
             'ingest_status'    => $weighingExists ? 'linked' : 'pending',
             'extra_meta'       => $data['metadata'] ?? null,
         ]);
@@ -299,22 +324,31 @@ class ImageUploadController extends Controller
 
         if ($weighingExists) {
             return response()->json([
-                'status' => 'success',
-                'image_id' => $rec->id,
-                'weighing_id' => $weighingId,
-                'transaction_id' => $transactionId,
-                'url' => $url,
-                'checksum' => $rec->checksum_sha256,
-                'already_exists' => false
+                'status' => 'created',
+                'data' => [
+                    'id' => $rec->id,
+                    'weighing_id' => $weighingId,
+                    'filename' => $meta['path'],
+                    'url' => $url,
+                    'checksum' => $rec->checksum_sha256,
+                ]
             ], 201);
         }
 
+        // generate a job_id for linking later and return 202
+        $jobId = (string) Str::uuid();
+        // persist job id in extra_meta for tracking
+        $rec->extra_meta = array_merge($rec->extra_meta ?? [], ['link_job_id' => $jobId]);
+        $rec->save();
+
         return response()->json([
             'status' => 'accepted',
-            'image_id' => $rec->id,
-            'weighing_id' => null,
-            'transaction_id' => $transactionId,
-            'info' => 'Saved; weighing not found. Will link when weighing record becomes available.'
+            'message' => 'queued for linking',
+            'data' => [
+                'id' => $rec->id,
+                'weighing_id' => null,
+            ],
+            'job_id' => $jobId
         ], 202);
 
     } catch (\Throwable $e) {

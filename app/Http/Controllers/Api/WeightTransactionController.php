@@ -308,7 +308,7 @@ class WeightTransactionController extends Controller
                 ]);
 
                 return response()->json([
-                    'message' => 'Transaction created successfully.',
+                    'status' => 'created',
                     'data'    => $transaction,
                     'rid'     => $rid,
                 ], 201);
@@ -402,7 +402,7 @@ class WeightTransactionController extends Controller
         $transaction->refresh();
 
         return response()->json([
-            'message' => 'Transaction updated successfully.',
+            'status' => 'updated',
             'data'    => $transaction,
         ]);
     }

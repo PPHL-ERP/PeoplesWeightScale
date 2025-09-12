@@ -17,6 +17,7 @@ class UploadImageRequest extends FormRequest
         return [
             'weighing_id' => 'nullable|integer',
             'transaction_id' => 'nullable|string|max:128',
+            'mode' => 'nullable|string|in:gross,tare',
             'camera_no' => 'required|string|max:16',
             'capture_datetime' => 'nullable|date',
             'capture_date' => 'nullable|date',

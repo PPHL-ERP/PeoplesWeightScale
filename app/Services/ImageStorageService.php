@@ -25,27 +25,28 @@ class ImageStorageService
         if (!$origChecksum) {
             $origChecksum = hash('sha256', $bytes);
         }
-        // Choose extension based on content type (prefer PNG/JPEG to match frontend expectations)
-        $ext = 'png';
-        if ($contentType === 'image/jpeg' || $contentType === 'image/jpg') {
-            $ext = 'jpg';
-        }
-
-        // Build filename per frontend convention: <identity>_<mode>_<cameraNo>.<ext>
+        // Always convert to webp and save as .webp per frontend requirement
         $modePart = $mode ? ($mode . '_') : '';
-        $fileName = sprintf('%s_%s%s.%s', $identity, $modePart, $cameraNo, $ext);
-
+        $fileName = sprintf('%s_%s%s.webp', $identity, $modePart, $cameraNo);
         $path = "pictures/{$date}/{$identity}/{$fileName}";
 
-        // ensure directory exists and write raw bytes
-        Storage::disk('public')->put($path, $bytes);
-        $size = Storage::disk('public')->size($path);
+        try {
+            $img = Image::make($bytes);
+            // encode to webp with default quality (80)
+            $webpContents = (string) $img->encode('webp', 80);
 
-        return [
-            'path' => $path,
-            'size' => $size,
-            'checksum' => $origChecksum,
-            'content_type' => $contentType ?? ($ext === 'jpg' ? 'image/jpeg' : 'image/png')
-        ];
+            Storage::disk('public')->put($path, $webpContents);
+            $size = Storage::disk('public')->size($path);
+
+            return [
+                'path' => $path,
+                'size' => $size,
+                'checksum' => $origChecksum,
+                'content_type' => 'image/webp'
+            ];
+        } catch (\Exception $e) {
+            // fail hard so caller returns 500 and frontend can retry
+            throw new \Exception('webp_conversion_failed: ' . $e->getMessage());
+        }
     }
 }
