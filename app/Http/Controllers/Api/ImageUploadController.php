@@ -172,6 +172,8 @@ class ImageUploadController extends Controller
         ]);
 
         $transactionId = $data['transaction_id'];
+        $weighingId = $data['weighing_id'] ?? null;
+        $mode = $data['mode'] ?? null;
         $cameraNo = $data['camera_no'];
         $sectorId = $data['sector_id'] ?? null;
 
