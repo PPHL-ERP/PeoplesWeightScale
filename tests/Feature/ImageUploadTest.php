@@ -24,7 +24,7 @@ class ImageUploadTest extends TestCase
             'content_type' => 'image/png',
             'checksum' => hash('sha256', base64_decode($b64)),
             'mode' => 'gross',
-            'weighing_id' => null,
+            'weighing_id' => 123,
             'sector_id' => 45
         ];
 
@@ -33,7 +33,7 @@ class ImageUploadTest extends TestCase
 
         $this->assertDatabaseCount('transaction_images', 1);
         $rec = TransactionImage::first();
-        $this->assertStringContainsString('pictures/2025-09-12/45/', $rec->image_path);
+    $this->assertStringContainsString('pictures/45/2025-09-12/123/', $rec->image_path);
         Storage::disk('public')->assertExists($rec->image_path);
     }
 
@@ -55,13 +55,14 @@ class ImageUploadTest extends TestCase
             'content_type' => 'image/png',
             'checksum' => hash('sha256', $png),
             'mode' => 'tare',
-            'sector_id' => 99
+            'sector_id' => 99,
+            'weighing_id' => 124
         ]);
 
         $response->assertStatus(201)->assertJson(['status' => 'created']);
         $this->assertDatabaseCount('transaction_images', 1);
         $rec = TransactionImage::first();
-        $this->assertStringContainsString('pictures/2025-09-12/99/', $rec->image_path);
+    $this->assertStringContainsString('pictures/99/2025-09-12/124/', $rec->image_path);
         Storage::disk('public')->assertExists($rec->image_path);
     }
 }

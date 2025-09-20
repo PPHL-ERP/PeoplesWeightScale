@@ -15,7 +15,8 @@ class UploadImageRequest extends FormRequest
     public function rules()
     {
         return [
-            'weighing_id' => 'nullable|integer',
+            // New policy: frontend will provide a weighing_id (predicted if necessary)
+            'weighing_id' => 'required|integer',
             'transaction_id' => 'nullable|string|max:128',
             'sector_id' => 'nullable|integer',
             'mode' => 'nullable|string|in:gross,tare',
@@ -36,7 +37,8 @@ class UploadImageRequest extends FormRequest
         return [
             'camera_no.required' => 'camera_no is required',
             'image_base64.required' => 'image_base64 is required',
-            'checksum.required' => 'checksum is required and must be sha256 hex of raw bytes',
+            // checksum may be omitted; server will compute if absent
+            'weighing_id.required' => 'weighing_id is required (frontend must include or predict it)',
         ];
     }
 }

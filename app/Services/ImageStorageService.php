@@ -21,16 +21,18 @@ class ImageStorageService
      */
     public function saveBytes(string $bytes, string $identity, string $cameraNo, \DateTimeInterface $capturedAt, ?string $contentType = null, ?string $origChecksum = null, ?string $mode = null, ?int $sectorId = null): array
     {
-        $date = Carbon::instance($capturedAt)->format('Y-m-d');
+        // Use UTC date for directory naming to avoid timezone mismatch
+        $date = Carbon::instance($capturedAt)->utc()->format('Y-m-d');
         if (!$origChecksum) {
             $origChecksum = hash('sha256', $bytes);
         }
         // Decide segment (sector-first). If sectorId provided use it, otherwise use identity (weighing_id or transaction_id)
         $segment = $sectorId ? (string)$sectorId : (string)$identity;
         $modePart = $mode ? ($mode . '_') : '';
-        // Use PNG by default to match frontend; keep extension .png
+        // Filename should be based on weighing_id/identity and mode, matching frontend
         $fileName = sprintf('%s_%s%s.png', $identity, $modePart, $cameraNo);
-        $path = "pictures/{$date}/{$segment}/{$fileName}";
+        // New layout: pictures/{sector}/{date}/{weighing_id}/{fileName}
+        $path = "pictures/{$segment}/{$date}/{$identity}/{$fileName}";
 
         // Ensure directory exists for local disk: Storage::disk('public') maps to storage/app/public
         $disk = Storage::disk('public');
@@ -45,7 +47,8 @@ class ImageStorageService
                 $contentTypeSaved = 'image/webp';
                 // adjust filename for webp if converting
                 $fileName = preg_replace('/\.png$/', '.webp', $fileName);
-                $path = "pictures/{$date}/{$segment}/{$fileName}";
+                // Use same sector-first layout for webp
+                $path = "pictures/{$segment}/{$date}/{$identity}/{$fileName}";
             } else {
                 // store original bytes as PNG
                 $contents = $bytes;

@@ -102,7 +102,8 @@ class ImageUploadController extends Controller
         try {
             $identity = $weighingId ? (string)$weighingId : ($transactionId ?? 'unknown');
             $mode = $data['mode'] ?? null;
-            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, $checksum, $mode);
+            $sectorId = $data['sector_id'] ?? null;
+            $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, $checksum, $mode, $sectorId);
         } catch (\Exception $e) {
             Log::error('Image save failed: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to save image'], 500);
@@ -110,14 +111,17 @@ class ImageUploadController extends Controller
 
         // insert DB record
         $rec = TransactionImage::create([
+            'weighing_id' => $weighingId,
             'transaction_id' => $transactionId,
+            'sector_id' => $sectorId ?? null,
+            'mode' => $mode,
             'camera_no' => $cameraNo,
             'captured_at' => $capturedAt,
             'image_path' => $meta['path'],
             'storage_backend' => 'local',
             'content_type' => $meta['content_type'],
             'size_bytes' => $meta['size'],
-            'checksum_sha256' => $meta['checksum'],
+            'checksum_sha256' => $meta['checksum'] ?? $checksum,
             'ingest_status' => 'stored'
         ]);
 
@@ -318,6 +322,7 @@ class ImageUploadController extends Controller
         $rec = TransactionImage::create([
             'weighing_id'      => $weighingId,
             'transaction_id'   => $transactionId,
+            'sector_id'        => $sectorId ?? null,
             'mode'             => $mode,
             'camera_no'        => $cameraNo,
             'captured_at'      => $capturedAt,
