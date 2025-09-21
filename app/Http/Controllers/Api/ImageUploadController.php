@@ -138,8 +138,12 @@ class ImageUploadController extends Controller
     $t0 = microtime(true);
     $rid = (string) Str::uuid();
 
-    // Use a dedicated channel (configure below). Fallback to default if you prefer: Log::
-    $logger = Log::channel('upload');
+    // Try to use a dedicated 'upload' channel; fall back to 'single' (laravel.log) if not configured
+    try {
+        $logger = Log::channel('upload');
+    } catch (\InvalidArgumentException $e) {
+        $logger = Log::channel('single');
+    }
 
     $baseCtx = [
         'request_id'     => $rid,
@@ -318,26 +322,37 @@ class ImageUploadController extends Controller
             }
         }
 
-        // create DB record including mode
-        $rec = TransactionImage::create([
-            'weighing_id'      => $weighingId,
-            'transaction_id'   => $transactionId,
-            'sector_id'        => $sectorId ?? null,
-            'mode'             => $mode,
-            'camera_no'        => $cameraNo,
-            'captured_at'      => $capturedAt,
-            'image_path'       => $meta['path'],
-            'storage_backend'  => 'local',
-            'content_type'     => $meta['content_type'],
-            'size_bytes'       => $meta['size'],
-            'checksum_sha256'  => $checksum,
-            'ingest_status'    => $weighingExists ? 'linked' : 'pending',
-            'extra_meta'       => $data['metadata'] ?? null,
-        ]);
-        $logger->info('upload.db_created', $baseCtx + [
-            'record_id'  => $rec->id,
-            'image_path' => $rec->image_path,
-        ]);
+        // create DB record including mode (wrap in try/catch: if DB insert fails delete saved file)
+        try {
+            $rec = TransactionImage::create([
+                'weighing_id'      => $weighingId,
+                'transaction_id'   => $transactionId,
+                'sector_id'        => $sectorId ?? null,
+                'mode'             => $mode,
+                'camera_no'        => $cameraNo,
+                'captured_at'      => $capturedAt,
+                'image_path'       => $meta['path'],
+                'storage_backend'  => 'local',
+                'content_type'     => $meta['content_type'],
+                'size_bytes'       => $meta['size'],
+                'checksum_sha256'  => $checksum,
+                'ingest_status'    => $weighingExists ? 'linked' : 'pending',
+                'extra_meta'       => $data['metadata'] ?? null,
+            ]);
+            $logger->info('upload.db_created', $baseCtx + [
+                'record_id'  => $rec->id,
+                'image_path' => $rec->image_path,
+            ]);
+        } catch (\Exception $e) {
+            // Attempt to delete the stored image to avoid orphaned files
+            try {
+                Storage::disk('public')->delete($meta['path']);
+            } catch (\Throwable $inner) {
+                $logger->error('upload.cleanup_failed', $baseCtx + ['error' => $inner->getMessage(), 'path' => $meta['path'] ?? null]);
+            }
+            $logger->error('upload.db_create_failed', $baseCtx + ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => 'Failed to persist image metadata', 'error' => $e->getMessage()], 500);
+        }
 
         $url = Storage::disk('public')->url($meta['path']);
         $durationMs = (int) round((microtime(true) - $t0) * 1000);
