@@ -26,6 +26,10 @@ class ImageUploadController extends Controller
     $weighingId = $data['weighing_id'] ?? null;
     $mode = $data['mode'] ?? null;
 
+    // minimal logger/context for the old upload path
+    try { $logger = Log::channel('upload'); } catch (\Throwable $e) { $logger = Log::channel('single'); }
+    $baseCtx = [ 'request_id' => (string) Str::uuid(), 'camera_no' => $request->input('camera_no') ];
+
         // parse captured datetime
         if (!empty($data['capture_datetime'])) {
             $capturedAt = Carbon::parse($data['capture_datetime']);
@@ -61,7 +65,7 @@ class ImageUploadController extends Controller
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $contentType = $finfo->buffer($bytes) ?: 'image/png';
         }
-        if (!in_array($contentType, ['image/png', 'image/jpeg'])) {
+        if (!in_array($contentType, ['image/png', 'image/jpeg', 'image/webp'])) {
             return response()->json(['message' => 'Unsupported image type: ' . $contentType], 400);
         }
 
@@ -236,7 +240,7 @@ class ImageUploadController extends Controller
             $logger->debug('upload.mime_provided', $baseCtx + ['content_type' => $contentType]);
         }
 
-        if (!in_array($contentType, ['image/png', 'image/jpeg'])) {
+        if (!in_array($contentType, ['image/png', 'image/jpeg', 'image/webp'])) {
             $logger->warning('upload.unsupported_type', $baseCtx + ['content_type' => $contentType]);
             return response()->json(['message' => 'Unsupported image type: ' . $contentType], 400);
         }

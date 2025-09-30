@@ -259,6 +259,7 @@ class WeightTransactionController extends Controller
                 'volume',
                 'price',
                 'discount',
+                'deduction',
                 'customer_id',
                 'vendor_id',
                 'sale_id',

@@ -33,6 +33,7 @@ class WeightTransaction extends Model
         'price',
         'amount',
         'discount',
+    'deduction',
         'real_net',
         'customer_id',
         'vendor_id',

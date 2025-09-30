@@ -15,8 +15,8 @@ class UploadImageRequest extends FormRequest
     public function rules()
     {
         return [
-            // New policy: frontend will provide a weighing_id (predicted if necessary)
-            'weighing_id' => 'required|integer',
+            // New policy: frontend may provide a weighing_id (predicted if necessary)
+            'weighing_id' => 'nullable|integer',
             'transaction_id' => 'nullable|string|max:128',
             'sector_id' => 'nullable|integer',
             'mode' => 'nullable|string|in:gross,tare',
@@ -25,8 +25,8 @@ class UploadImageRequest extends FormRequest
             'capture_date' => 'nullable|date',
             'capture_time' => 'nullable|string',
             'image_base64' => 'required_without:image_file|string',
-            'image_file' => 'nullable|file|mimes:png,jpeg|sometimes|max:5120',
-            'content_type' => 'nullable|string|in:image/png,image/jpeg',
+            'image_file' => 'nullable|file|mimes:png,jpeg,webp|sometimes|max:5120',
+            'content_type' => 'nullable|string|in:image/png,image/jpeg,image/webp',
             'checksum' => 'nullable|string|size:64',
             'metadata' => 'nullable|array'
         ];
@@ -38,7 +38,7 @@ class UploadImageRequest extends FormRequest
             'camera_no.required' => 'camera_no is required',
             'image_base64.required' => 'image_base64 is required',
             // checksum may be omitted; server will compute if absent
-            'weighing_id.required' => 'weighing_id is required (frontend must include or predict it)',
+            // weighing_id is optional; frontend is encouraged to provide it if available
         ];
     }
 }

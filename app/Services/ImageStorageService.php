@@ -50,9 +50,16 @@ class ImageStorageService
                 // Use same sector-first layout for webp
                 $path = "pictures/{$segment}/{$date}/{$identity}/{$fileName}";
             } else {
-                // store original bytes as PNG
+                // store original bytes; try to infer extension from contentType
                 $contents = $bytes;
                 $contentTypeSaved = $contentType ?? 'image/png';
+                // preserve extension if provided via content type
+                if ($contentTypeSaved === 'image/jpeg') {
+                    $fileName = preg_replace('/\.png$/', '.jpg', $fileName);
+                } elseif ($contentTypeSaved === 'image/webp') {
+                    $fileName = preg_replace('/\.png$/', '.webp', $fileName);
+                }
+                $path = "pictures/{$segment}/{$date}/{$identity}/{$fileName}";
             }
 
             // Atomic write for local disk: write to a temp path then move
