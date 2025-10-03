@@ -81,4 +81,16 @@ class WeightTransaction extends Model
     {
         return $this->belongsTo(Sector::class, 'sector_id');
     }
+        public function imagesById()   // preferred FK-based
+    {
+        return $this->hasMany(\App\Models\TransactionImage::class, 'weighing_id', 'id')
+                    ->orderBy('captured_at','asc');
+    }
+
+    public function imagesByTxn()  // legacy fallback (if any old rows)
+    {
+        return $this->hasMany(\App\Models\TransactionImage::class, 'transaction_id', 'transaction_id')
+                    ->orderBy('captured_at','asc');
+    }
+
 }

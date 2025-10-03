@@ -37,7 +37,7 @@ class WeightTransactionController extends Controller
         return view('weight_transactions.index'); // the Blade below
     }
 
-    public function datatable(Request $request)
+    public function datatableold(Request $request)
     {
         $q = WeightTransaction::query()->select([
             'id',
@@ -89,6 +89,97 @@ class WeightTransactionController extends Controller
 
         $rows = $q->orderByDesc('created_at')->limit(2000)->get(); // cap for speed
         return response()->json(['data' => $rows]);
+    }
+    public function datatable(Request $request)
+    {
+        $q = WeightTransaction::query()
+            ->with([
+                'imagesById:id,weighing_id,image_path,storage_backend,mode,captured_at,sector_id',
+                'imagesByTxn:id,transaction_id,image_path,storage_backend,mode,captured_at,sector_id',
+            ])
+            ->select([
+                'id','transaction_id',
+                'weight_type','transfer_type','select_mode',
+                'vehicle_type','vehicle_no',
+                'material','productType',
+                'gross_weight','tare_weight','real_net',
+                'volume','price','discount','amount',
+                'customer_name',
+                'sale_id','purchase_id',
+                'sector_id','sector_name','username',
+                'status','created_at',
+            ]);
+
+        // ---- your existing filters here (unchanged) ----
+        if ($s = trim((string)$request->get('search_text'))) {
+            $q->where(function($x) use ($s){
+                $x->where('transaction_id','like',"%$s%")
+                ->orWhere('vehicle_no','like',"%$s%")
+                ->orWhere('customer_name','like',"%$s%")
+                ->orWhere('material','like',"%$s%")
+                ->orWhere('sector_name','like',"%$s%")
+                ->orWhere('username','like',"%$s%");
+            });
+        }
+        if ($from = $request->get('from_date')) {
+            $to = $request->get('to_date') ?: $from;
+            $q->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        }
+        if ($wt = $request->get('weight_type'))   $q->where('weight_type', $wt);
+        if ($tt = $request->get('transfer_type')) $q->where('transfer_type', $tt);
+        if ($st = $request->get('status'))        $q->where('status', $st);
+        if ($vno = trim((string)$request->get('vehicle_no'))) {
+            $q->where('vehicle_no','like',"%$vno%");
+        }
+
+        $rows = $q->orderByDesc('id')->limit(200)->get();
+
+        // Transform to plain arrays + photos & thumb
+        $data = $rows->map(function ($t) {
+            $imgs = $t->imagesById->isNotEmpty() ? $t->imagesById : $t->imagesByTxn;
+
+            $photos = $imgs->map(fn($img) => [
+                'url'  => $img->url,
+                'mode' => $img->mode,
+                'at'   => optional($img->captured_at)->toIso8601String(),
+            ])->filter(fn($p)=>!empty($p['url']))->values()->all();
+
+            $thumb = $photos[0]['url'] ?? null;
+
+            return [
+                'id'             => $t->id,
+                'transaction_id' => $t->transaction_id,
+                'weight_type'    => $t->weight_type,
+                'transfer_type'  => $t->transfer_type,
+                'select_mode'    => $t->select_mode,
+                'vehicle_type'   => $t->vehicle_type,
+                'vehicle_no'     => $t->vehicle_no,
+                'material'       => $t->material,
+                'productType'    => $t->productType,
+                'gross_weight'   => $t->gross_weight,
+                'tare_weight'    => $t->tare_weight,
+                'real_net'       => $t->real_net,
+                'volume'         => $t->volume,
+                'price'          => $t->price,
+                'discount'       => $t->discount,
+                'amount'         => $t->amount,
+                'customer_name'  => $t->customer_name,
+                'sale_id'        => $t->sale_id,
+                'purchase_id'    => $t->purchase_id,
+                'sector_id'      => $t->sector_id,
+                'sector_name'    => $t->sector_name,
+                'username'       => $t->username,
+                'status'         => $t->status,
+                'created_at'     => $t->created_at,
+
+                // images payload for table
+                'photos'     => $photos,               // [{url, mode, at}, ...]
+                'photo_urls' => array_column($photos,'url'), // [string,...] if needed
+                'thumb'      => $thumb,                // first image (for inline thumb)
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 
 
