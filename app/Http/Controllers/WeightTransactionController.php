@@ -103,7 +103,7 @@ class WeightTransactionController extends Controller
                 'vehicle_type','vehicle_no',
                 'material','productType',
                 'gross_weight','tare_weight','real_net',
-                'volume','price','discount','amount',
+                'deduction',
                 'customer_name',
                 'sale_id','purchase_id',
                 'sector_id','sector_name','username',
