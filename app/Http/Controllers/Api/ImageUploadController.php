@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\UploadImageRequest;
 use App\Models\TransactionImage;
 use App\Services\ImageStorageService;
+use App\Services\SectorModelResolver;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
@@ -14,10 +15,38 @@ use Illuminate\Support\Str;
 class ImageUploadController extends Controller
 {
     protected ImageStorageService $storageService;
+    protected SectorModelResolver $sectorResolver;
 
-    public function __construct(ImageStorageService $storageService)
+    public function __construct(ImageStorageService $storageService, SectorModelResolver $sectorResolver)
     {
         $this->storageService = $storageService;
+        $this->sectorResolver = $sectorResolver;
+    }
+
+    /**
+     * Get the appropriate TransactionImage model class based on sector.
+     * 
+     * @param int|null $sectorId
+     * @return string Model class name
+     */
+    private function getImageModelClass(?int $sectorId): string
+    {
+        if ($sectorId) {
+            try {
+                return $this->sectorResolver->getModelClass(
+                    TransactionImage::class,
+                    $sectorId
+                );
+            } catch (\Exception $e) {
+                Log::warning('ImageUpload: sector model resolution failed, using base model', [
+                    'error' => $e->getMessage(),
+                    'sector_id' => $sectorId,
+                ]);
+            }
+        }
+        
+        // Fallback to base model
+        return TransactionImage::class;
     }
 
     public function uploadold(UploadImageRequest $request): JsonResponse
@@ -82,18 +111,22 @@ class ImageUploadController extends Controller
             return response()->json(['status' => 'error', 'error' => 'checksum_mismatch', 'message' => 'checksum does not match image bytes'], 400);
         }
 
+        // Determine which model to use based on sector
+        $sectorId = $data['sector_id'] ?? null;
+        $imageModelClass = $this->getImageModelClass($sectorId);
+
         // idempotency/deduplication: prefer (weighing_id, checksum) uniqueness if weighing_id supplied
         if ($weighingId) {
-            $existing = TransactionImage::where('weighing_id', $weighingId)
+            $existing = $imageModelClass::where('weighing_id', $weighingId)
                 ->where('checksum_sha256', $checksum)
                 ->first();
         } elseif ($transactionId) {
-            $existing = TransactionImage::where('transaction_id', $transactionId)
+            $existing = $imageModelClass::where('transaction_id', $transactionId)
                 ->where('checksum_sha256', $checksum)
                 ->first();
         } else {
             // fallback global checksum check
-            $existing = TransactionImage::where('checksum_sha256', $checksum)->first();
+            $existing = $imageModelClass::where('checksum_sha256', $checksum)->first();
         }
         if ($existing) {
             return response()->json([
@@ -102,19 +135,18 @@ class ImageUploadController extends Controller
             ], 200);
         }
 
-        // save bytes via service
+        // save bytes via service (UNCHANGED - file storage logic preserved)
         try {
             $identity = $weighingId ? (string)$weighingId : ($transactionId ?? 'unknown');
             $mode = $data['mode'] ?? null;
-            $sectorId = $data['sector_id'] ?? null;
             $meta = $this->storageService->saveBytes($bytes, $identity, $cameraNo, $capturedAt, $contentType, $checksum, $mode, $sectorId);
         } catch (\Exception $e) {
             Log::error('Image save failed: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to save image'], 500);
         }
 
-        // insert DB record
-        $rec = TransactionImage::create([
+        // insert DB record using sector-specific model
+        $rec = $imageModelClass::create([
             'weighing_id' => $weighingId,
             'transaction_id' => $transactionId,
             'sector_id' => $sectorId ?? null,
@@ -126,7 +158,8 @@ class ImageUploadController extends Controller
             'content_type' => $meta['content_type'],
             'size_bytes' => $meta['size'],
             'checksum_sha256' => $meta['checksum'] ?? $checksum,
-            'ingest_status' => 'stored'
+            'ingest_status' => 'stored',
+            'isSynced' => $data['isSynced'] ?? false,
         ]);
 
         $url = Storage::disk('public')->url($meta['path']);
@@ -260,18 +293,27 @@ class ImageUploadController extends Controller
             'checksum_sha256_prefix' => substr($checksum, 0, 12),
         ]);
 
+        // Determine which model to use based on sector
+        $imageModelClass = $this->getImageModelClass($sectorId);
+        if ($imageModelClass !== TransactionImage::class) {
+            $logger->debug('upload.using_sector_model', $baseCtx + [
+                'model' => $imageModelClass,
+                'sector_id' => $sectorId,
+            ]);
+        }
+
         // idempotency: check existing by txn+cam+time
         // Primary dedup by (weighing_id, checksum)
         if ($weighingId) {
-            $existing = TransactionImage::where('weighing_id', $weighingId)
+            $existing = $imageModelClass::where('weighing_id', $weighingId)
                 ->where('checksum_sha256', $checksum)
                 ->first();
         } elseif ($transactionId) {
-            $existing = TransactionImage::where('transaction_id', $transactionId)
+            $existing = $imageModelClass::where('transaction_id', $transactionId)
                 ->where('checksum_sha256', $checksum)
                 ->first();
         } else {
-            $existing = TransactionImage::where('checksum_sha256', $checksum)->first();
+            $existing = $imageModelClass::where('checksum_sha256', $checksum)->first();
         }
 
         if ($existing) {
@@ -318,17 +360,31 @@ class ImageUploadController extends Controller
         // determine association state: link to weighing if exists, else store pending
         $weighingExists = false;
         if ($weighingId) {
-            // check existence of weighing record (use WeightTransaction model)
+            // check existence of weighing record (use WeightTransaction model or sector-specific variant)
             try {
-                $weighingExists = (bool) \App\Models\WeightTransaction::find($weighingId);
+                if ($sectorId) {
+                    try {
+                        $wtModelClass = $this->sectorResolver->getModelClass(
+                            \App\Models\WeightTransaction::class,
+                            $sectorId
+                        );
+                        $weighingExists = (bool) $wtModelClass::find($weighingId);
+                    } catch (\Exception $e) {
+                        // Fallback to base model
+                        $weighingExists = (bool) \App\Models\WeightTransaction::find($weighingId);
+                    }
+                } else {
+                    $weighingExists = (bool) \App\Models\WeightTransaction::find($weighingId);
+                }
             } catch (\Throwable $e) {
                 $weighingExists = false;
             }
         }
 
         // create DB record including mode (wrap in try/catch: if DB insert fails delete saved file)
+        // USING SECTOR-SPECIFIC MODEL
         try {
-            $rec = TransactionImage::create([
+            $rec = $imageModelClass::create([
                 'weighing_id'      => $weighingId,
                 'transaction_id'   => $transactionId,
                 'sector_id'        => $sectorId ?? null,
@@ -342,10 +398,12 @@ class ImageUploadController extends Controller
                 'checksum_sha256'  => $checksum,
                 'ingest_status'    => $weighingExists ? 'linked' : 'pending',
                 'extra_meta'       => $data['metadata'] ?? null,
+                'isSynced'         => $data['isSynced'] ?? false,
             ]);
             $logger->info('upload.db_created', $baseCtx + [
                 'record_id'  => $rec->id,
                 'image_path' => $rec->image_path,
+                'model_class' => $imageModelClass,
             ]);
         } catch (\Exception $e) {
             // Attempt to delete the stored image to avoid orphaned files

@@ -28,7 +28,8 @@ class UploadImageRequest extends FormRequest
             'image_file' => 'nullable|file|mimes:png,jpeg,webp|sometimes|max:5120',
             'content_type' => 'nullable|string|in:image/png,image/jpeg,image/webp',
             'checksum' => 'nullable|string|size:64',
-            'metadata' => 'nullable|array'
+            'metadata' => 'nullable|array',
+            'isSynced' => 'nullable|boolean',
         ];
     }
 
