@@ -6,11 +6,18 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use App\Models\WeightTransaction;
+use App\Services\SectorModelResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 class WeightTransactionController extends Controller
 {
+    protected SectorModelResolver $sectorResolver;
+
+    public function __construct(SectorModelResolver $sectorResolver)
+    {
+        $this->sectorResolver = $sectorResolver;
+    }
 
     public function showTable(Request $request)
     {
@@ -270,6 +277,7 @@ class WeightTransactionController extends Controller
                 'username',
                 'status',
                 'detection', // <-- new column
+                'isSynced',
             ]);
 
             // Computed fields
@@ -303,8 +311,38 @@ class WeightTransactionController extends Controller
             $data['updated_at'] = $now;
 
             try {
-                $id = DB::table('weight_transactions')->insertGetId($data);
-                $transaction = WeightTransaction::find($id);
+                // Determine which model to use based on sector
+                $sectorId = $data['sector_id'] ?? null;
+                $sectorName = $data['sector_name'] ?? null;
+
+                if ($sectorId || $sectorName) {
+                    // Use sector-specific model
+                    $modelClass = $this->sectorResolver->getModelClass(
+                        WeightTransaction::class,
+                        $sectorId,
+                        $sectorName
+                    );
+                    $tableName = $this->sectorResolver->getTableName(
+                        WeightTransaction::class,
+                        $sectorId,
+                        $sectorName
+                    );
+                    
+                    Log::channel($logChannel)->info('WeightTransaction.store: using sector-specific model', [
+                        'model' => $modelClass,
+                        'table' => $tableName,
+                        'sector_id' => $sectorId,
+                        'sector_name' => $sectorName,
+                    ]);
+
+                    $id = DB::table($tableName)->insertGetId($data);
+                    $transaction = $modelClass::find($id);
+                } else {
+                    // Use base model (backward compatibility)
+                    Log::channel($logChannel)->warning('WeightTransaction.store: no sector specified, using base model');
+                    $id = DB::table('weight_transactions')->insertGetId($data);
+                    $transaction = WeightTransaction::find($id);
+                }
 
                 Log::channel($logChannel)->info('WeightTransaction.store: created', [
                     'id'              => $id,
@@ -340,7 +378,37 @@ class WeightTransactionController extends Controller
     // ✅ Update
     public function update(Request $request, $id)
     {
-        $transaction = WeightTransaction::findOrFail($id);
+        // First, try to determine sector from request
+        $sectorId = $request->input('sector_id');
+        $sectorName = $request->input('sector_name');
+
+        // Determine which model to use
+        if ($sectorId || $sectorName) {
+            try {
+                $modelClass = $this->sectorResolver->getModelClass(
+                    WeightTransaction::class,
+                    $sectorId,
+                    $sectorName
+                );
+                $transaction = $modelClass::findOrFail($id);
+                
+                Log::info('WeightTransaction.update: using sector-specific model', [
+                    'model' => $modelClass,
+                    'id' => $id,
+                    'sector_id' => $sectorId,
+                    'sector_name' => $sectorName,
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('WeightTransaction.update: sector model resolution failed, using base model', [
+                    'error' => $e->getMessage(),
+                    'id' => $id,
+                ]);
+                $transaction = WeightTransaction::findOrFail($id);
+            }
+        } else {
+            // Use base model (backward compatibility)
+            $transaction = WeightTransaction::findOrFail($id);
+        }
 
         $validated = $request->validate([
             'transaction_id'     => 'nullable|string',
@@ -369,6 +437,7 @@ class WeightTransactionController extends Controller
             'others'             => 'nullable|string',
             'username'           => 'nullable|string',
             'status'             => 'nullable|string',
+            'isSynced'           => 'nullable|boolean',
         ]);
 
         // Recalculate amount & real_net

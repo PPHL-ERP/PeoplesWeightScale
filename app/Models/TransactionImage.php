@@ -24,7 +24,8 @@ class TransactionImage extends Model
         'size_bytes',
         'checksum_sha256',
         'ingest_status',
-        'extra_meta'
+        'extra_meta',
+        'isSynced',
     ];
 
     protected $casts = [
