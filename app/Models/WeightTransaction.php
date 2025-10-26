@@ -47,7 +47,6 @@ class WeightTransaction extends Model
         'others',
         'username',
         'status',
-        'isSynced',
     ];
 
     /**
