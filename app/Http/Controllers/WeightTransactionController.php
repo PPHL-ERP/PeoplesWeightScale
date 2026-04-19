@@ -5,9 +5,319 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\WeightTransaction;
+use App\Traits\SectorFilter;
+use App\Models\UserManagesSectors;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Models\User;
 
 class WeightTransactionController extends Controller
 {
+    use SectorFilter;
+
+private function currentUserId(): ?int
+{
+    if (auth()->check() && auth()->id()) {
+        return (int) auth()->id();
+    }
+
+    foreach (['user_id', 'userId', 'auth_user_id', 'jwt_user_id', 'login_user_id'] as $k) {
+        $v = session($k);
+        if (is_numeric($v)) return (int) $v;
+    }
+
+    $id = data_get(session('user'), 'id'); // array/object safe
+    return is_numeric($id) ? (int) $id : null;
+}
+
+
+public function filterOptions(Request $request)
+{
+    try {
+        $userId = $this->currentUserId();
+        if (!$userId) {
+            return response()->json([
+                'customers' => [],
+                'materials' => [],
+                'sectors'   => [],
+                'users'     => [],
+                'message'   => 'User session not found',
+            ], 200);
+        }
+
+        $isAdmin = $this->isAdminUser($userId);
+        $allowedSectorIds = $this->allowedSectorIds($userId);
+
+        // customers
+        $customers = DB::table('w_customer')
+            ->whereNull('deleted_at')
+            ->whereRaw('TRIM(COALESCE("cName", \'\')) <> \'\'')
+            ->selectRaw('MIN(id) as id, TRIM("cName") as text')
+            ->groupBy(DB::raw('TRIM("cName")'))
+            ->orderBy('text', 'asc') // <-- FIX
+            ->get();
+
+        // materials
+        $materials = DB::table('w_material')
+            ->whereNull('deleted_at')
+            ->whereRaw('TRIM(COALESCE("mName", \'\')) <> \'\'')
+            ->selectRaw('MIN(id) as id, TRIM("mName") as text')
+            ->groupBy(DB::raw('TRIM("mName")'))
+            ->orderBy('text', 'asc') // <-- FIX
+            ->get();
+
+        // sectors
+        $sectorsQ = DB::table('sectors')
+            ->whereNull('deleted_at')
+            ->whereRaw("TRIM(COALESCE(name, '')) <> ''")
+            ->selectRaw('id, TRIM(name) as text');
+
+        if (!$isAdmin) {
+            if (empty($allowedSectorIds)) {
+                $sectorsQ->whereRaw('1=0');
+            } else {
+                $sectorsQ->whereIn('id', $allowedSectorIds);
+            }
+        }
+
+        $sectors = $sectorsQ
+            ->orderBy('text', 'asc') // <-- FIX
+            ->get();
+
+        // users
+        $users = DB::table('users')
+            ->whereNull('deleted_at')
+            ->whereRaw("TRIM(COALESCE(name, '')) <> ''")
+            ->selectRaw("
+                id,
+                CASE
+                    WHEN TRIM(COALESCE(username, '')) <> ''
+                        THEN TRIM(name) || ' (' || TRIM(username) || ')'
+                    ELSE TRIM(name)
+                END as text
+            ")
+            ->orderBy('text', 'asc') // <-- FIX
+            ->get();
+
+        return response()->json([
+            'customers' => $customers,
+            'materials' => $materials,
+            'sectors'   => $sectors,
+            'users'     => $users,
+        ]);
+    } catch (\Throwable $e) {
+        Log::error('weight_transactions.filterOptions failed', [
+            'message' => $e->getMessage(),
+        ]);
+
+        return response()->json([
+            'customers' => [],
+            'materials' => [],
+            'sectors'   => [],
+            'users'     => [],
+            'message'   => 'Filter options error',
+            'error'     => $e->getMessage(),
+        ], 500);
+    }
+}
+
+
+public function datatable(Request $request)
+{
+    $q = WeightTransaction::query()
+        ->with([
+            'imagesById:id,weighing_id,image_path,storage_backend,mode,captured_at,sector_id',
+            'imagesByTxn:id,transaction_id,image_path,storage_backend,mode,captured_at,sector_id',
+        ])
+        ->select([
+            'id','transaction_id',
+            'weight_type','transfer_type','select_mode',
+            'vehicle_type','vehicle_no',
+            'material','productType',
+            'gross_weight','tare_weight','real_net',
+            'deduction',
+            'volume','price','discount','amount',
+            'customer_name',
+            'sale_id','purchase_id',
+            'sector_id','sector_name','username',
+            'status','created_at',
+        ]);
+
+    // ---------- USER SECTOR SCOPE (auth/session safe) ----------
+    $currentUserId = $this->currentUserId();
+    $isAdmin = $this->isAdminUser($currentUserId);
+    $allowedSectorIds = $this->allowedSectorIds($currentUserId);
+
+    $requestedSectorId = (int) $request->get('sector_id');
+
+    if ($isAdmin) {
+        if ($requestedSectorId > 0) {
+            $q->where('sector_id', $requestedSectorId);
+        }
+    } else {
+        if (empty($allowedSectorIds)) {
+            $q->whereRaw('1=0');
+        } else {
+            if ($requestedSectorId > 0) {
+                if (in_array($requestedSectorId, $allowedSectorIds, true)) {
+                    $q->where('sector_id', $requestedSectorId);
+                } else {
+                    $q->whereRaw('1=0');
+                }
+            } else {
+                $q->whereIn('sector_id', $allowedSectorIds);
+            }
+        }
+    }
+
+    // ---------- GLOBAL SEARCH ----------
+    if ($s = trim((string)$request->get('search_text'))) {
+        $q->where(function($x) use ($s){
+            $x->where('transaction_id','ilike',"%{$s}%")
+              ->orWhere('vehicle_no','ilike',"%{$s}%")
+              ->orWhere('customer_name','ilike',"%{$s}%")
+              ->orWhere('material','ilike',"%{$s}%")
+              ->orWhere('sector_name','ilike',"%{$s}%")
+              ->orWhere('username','ilike',"%{$s}%");
+        });
+    }
+
+    // ---------- CUSTOMER FILTER ----------
+    if ($customerId = (int) $request->get('customer_id')) {
+        $cName = DB::table('w_customer')->where('id', $customerId)->value('cName');
+        $cName = trim((string)$cName);
+        if ($cName !== '') {
+            $q->whereRaw('LOWER(TRIM(customer_name)) = LOWER(?)', [$cName]);
+        } else {
+            $q->whereRaw('1=0');
+        }
+    }
+
+    // ---------- MATERIAL FILTER ----------
+    if ($materialId = (int) $request->get('material_id')) {
+        $mName = DB::table('w_material')->where('id', $materialId)->value('mName');
+        $mName = trim((string)$mName);
+        if ($mName !== '') {
+            $q->whereRaw('LOWER(TRIM(material)) = LOWER(?)', [$mName]);
+        } else {
+            $q->whereRaw('1=0');
+        }
+    }
+
+    // ---------- USER FILTER ----------
+    if ($userId = (int) $request->get('user_id')) {
+        $u = DB::table('users')->select('name', 'username')->where('id', $userId)->first();
+
+        if ($u) {
+            $candidates = array_values(array_unique(array_filter([
+                trim((string)($u->name ?? '')),
+                trim((string)($u->username ?? '')),
+            ])));
+
+            if (!empty($candidates)) {
+                $q->where(function ($qq) use ($candidates) {
+                    foreach ($candidates as $cand) {
+                        $qq->orWhereRaw('LOWER(TRIM(username)) = LOWER(?)', [$cand]);
+                    }
+                });
+            } else {
+                $q->whereRaw('1=0');
+            }
+        } else {
+            $q->whereRaw('1=0');
+        }
+    }
+
+    // ---------- Other filters ----------
+    if ($from = $request->get('from_date')) {
+        $to = $request->get('to_date') ?: $from;
+        $q->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59']);
+    }
+
+    if ($wt = $request->get('weight_type'))   $q->where('weight_type', $wt);
+    if ($tt = $request->get('transfer_type')) $q->where('transfer_type', $tt);
+    if ($st = $request->get('status'))        $q->where('status', $st);
+
+    if ($vno = trim((string)$request->get('vehicle_no'))) {
+        $q->where('vehicle_no','ilike',"%{$vno}%");
+    }
+
+    $rows = $q->orderByDesc('id')->limit(2000)->get();
+
+    $data = $rows->map(function ($t) {
+        $imgs = $t->imagesById->isNotEmpty() ? $t->imagesById : $t->imagesByTxn;
+
+        $photos = $imgs->map(fn($img) => [
+            'url'  => $img->url,
+            'mode' => $img->mode,
+            'at'   => optional($img->captured_at)->toIso8601String(),
+        ])->filter(fn($p)=>!empty($p['url']))->values()->all();
+
+        return [
+            'id'             => $t->id,
+            'transaction_id' => $t->transaction_id,
+            'weight_type'    => $t->weight_type,
+            'transfer_type'  => $t->transfer_type,
+            'select_mode'    => $t->select_mode,
+            'vehicle_type'   => $t->vehicle_type,
+            'vehicle_no'     => $t->vehicle_no,
+            'material'       => $t->material,
+            'productType'    => $t->productType,
+            'gross_weight'   => $t->gross_weight,
+            'tare_weight'    => $t->tare_weight,
+            'real_net'       => $t->real_net,
+            'deduction'      => $t->deduction,
+            'volume'         => $t->volume,
+            'price'          => $t->price,
+            'discount'       => $t->discount,
+            'amount'         => $t->amount,
+            'customer_name'  => $t->customer_name,
+            'sale_id'        => $t->sale_id,
+            'purchase_id'    => $t->purchase_id,
+            'sector_id'      => $t->sector_id,
+            'sector_name'    => $t->sector_name,
+            'username'       => $t->username,
+            'status'         => $t->status,
+            'created_at'     => $t->created_at,
+            'photos'         => $photos,
+            'photo_urls'     => array_column($photos,'url'),
+            'thumb'          => $photos[0]['url'] ?? null,
+        ];
+    });
+
+    return response()->json(['data' => $data]);
+}
+
+    private function toBool($value): bool
+    {
+        if (is_bool($value)) return $value;
+        $v = strtolower(trim((string) $value));
+        return in_array($v, ['1','true','yes','y','on'], true);
+    }
+
+    private function isAdminUser(?int $userId): bool
+    {
+        if (!$userId) return false;
+        $u = User::find($userId);
+        if (!$u) return false;
+
+        return $this->toBool($u->isAdmin ?? null) || $this->toBool($u->isSuperAdmin ?? null);
+    }
+
+    private function allowedSectorIds(?int $userId): array
+    {
+        if (!$userId) return [];
+
+        return UserManagesSectors::query()
+            ->where('userId', $userId)
+            ->pluck('sectorId')
+            ->map(fn($x) => (int)$x)
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
+
     public function indexold(Request $request)
     {
         $q = WeightTransaction::query();
@@ -90,97 +400,7 @@ class WeightTransactionController extends Controller
         $rows = $q->orderByDesc('created_at')->limit(2000)->get(); // cap for speed
         return response()->json(['data' => $rows]);
     }
-    public function datatable(Request $request)
-    {
-        $q = WeightTransaction::query()
-            ->with([
-                'imagesById:id,weighing_id,image_path,storage_backend,mode,captured_at,sector_id',
-                'imagesByTxn:id,transaction_id,image_path,storage_backend,mode,captured_at,sector_id',
-            ])
-            ->select([
-                'id','transaction_id',
-                'weight_type','transfer_type','select_mode',
-                'vehicle_type','vehicle_no',
-                'material','productType',
-                'gross_weight','tare_weight','real_net',
-                'deduction',
-                'customer_name',
-                'sale_id','purchase_id',
-                'sector_id','sector_name','username',
-                'status','created_at',
-            ]);
 
-        // ---- your existing filters here (unchanged) ----
-        if ($s = trim((string)$request->get('search_text'))) {
-            $q->where(function($x) use ($s){
-                $x->where('transaction_id','like',"%$s%")
-                ->orWhere('vehicle_no','like',"%$s%")
-                ->orWhere('customer_name','like',"%$s%")
-                ->orWhere('material','like',"%$s%")
-                ->orWhere('sector_name','like',"%$s%")
-                ->orWhere('username','like',"%$s%");
-            });
-        }
-        if ($from = $request->get('from_date')) {
-            $to = $request->get('to_date') ?: $from;
-            $q->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59']);
-        }
-        if ($wt = $request->get('weight_type'))   $q->where('weight_type', $wt);
-        if ($tt = $request->get('transfer_type')) $q->where('transfer_type', $tt);
-        if ($st = $request->get('status'))        $q->where('status', $st);
-        if ($vno = trim((string)$request->get('vehicle_no'))) {
-            $q->where('vehicle_no','like',"%$vno%");
-        }
-
-        $rows = $q->orderByDesc('id')->limit(200)->get();
-
-        // Transform to plain arrays + photos & thumb
-        $data = $rows->map(function ($t) {
-            $imgs = $t->imagesById->isNotEmpty() ? $t->imagesById : $t->imagesByTxn;
-
-            $photos = $imgs->map(fn($img) => [
-                'url'  => $img->url,
-                'mode' => $img->mode,
-                'at'   => optional($img->captured_at)->toIso8601String(),
-            ])->filter(fn($p)=>!empty($p['url']))->values()->all();
-
-            $thumb = $photos[0]['url'] ?? null;
-
-            return [
-                'id'             => $t->id,
-                'transaction_id' => $t->transaction_id,
-                'weight_type'    => $t->weight_type,
-                'transfer_type'  => $t->transfer_type,
-                'select_mode'    => $t->select_mode,
-                'vehicle_type'   => $t->vehicle_type,
-                'vehicle_no'     => $t->vehicle_no,
-                'material'       => $t->material,
-                'productType'    => $t->productType,
-                'gross_weight'   => $t->gross_weight,
-                'tare_weight'    => $t->tare_weight,
-                'real_net'       => $t->real_net,
-                'volume'         => $t->volume,
-                'price'          => $t->price,
-                'discount'       => $t->discount,
-                'amount'         => $t->amount,
-                'customer_name'  => $t->customer_name,
-                'sale_id'        => $t->sale_id,
-                'purchase_id'    => $t->purchase_id,
-                'sector_id'      => $t->sector_id,
-                'sector_name'    => $t->sector_name,
-                'username'       => $t->username,
-                'status'         => $t->status,
-                'created_at'     => $t->created_at,
-
-                // images payload for table
-                'photos'     => $photos,               // [{url, mode, at}, ...]
-                'photo_urls' => array_column($photos,'url'), // [string,...] if needed
-                'thumb'      => $thumb,                // first image (for inline thumb)
-            ];
-        });
-
-        return response()->json(['data' => $data]);
-    }
 
 
     public function create()

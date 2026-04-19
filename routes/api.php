@@ -182,6 +182,11 @@ Route::get('/sync-sales-employees', function (SalesEmployeeSyncService $syncServ
     Route::post('/sales-employees-flat', [SalesEmployeeFlatController::class, 'store']);
 
 
+    Route::get('/weight-transactions/filter-options', [WeightTransactionController::class, 'filterOptions'])
+        ->name('weight_transactions.filter_options');
+
+    // Route::get('/weight-transactions/datatable', [WeightTransactionController::class, 'datatable'])
+    //     ->name('weight_transactions.datatable');
 
     // Location Management
     Route::get('get-countries', [LocationController::class, 'getAllCountries'])->name('get-countries');

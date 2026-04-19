@@ -17,7 +17,7 @@
   <hr/>
 
   {{-- Filters --}}
-  {{-- <div class="card mb-3">
+  <div class="card mb-3">
     <div class="card-body">
       <div class="row g-2">
         <div class="col-md-3">
@@ -71,103 +71,7 @@
         </div>
       </div>
     </div>
-  </div> --}}
-{{-- Filters --}}
-<div class="card mb-3">
-  <div class="card-body">
-    <div class="row g-2">
-      <div class="col-md-3">
-        <label class="form-label">Global Search</label>
-        <input id="f_search" type="text" class="form-control" placeholder="Txn/Vehicle/Customer/Material/Sector/User">
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">From</label>
-        <input id="f_from" type="date" class="form-control">
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">To</label>
-        <input id="f_to" type="date" class="form-control">
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">Weight Type</label>
-        <select id="f_weight_type" class="form-select s2">
-          <option value="">All</option>
-          <option value="Sales">Sales</option>
-          <option value="Purchase">Purchase</option>
-          <option value="Weighing Service">Weighing Service</option>
-        </select>
-      </div>
-
-      <div class="col-md-1">
-        <label class="form-label">Transfer</label>
-        <select id="f_transfer_type s2" class="form-select">
-          <option value="">All</option>
-          <option value="In">In</option>
-          <option value="Out">Out</option>
-        </select>
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">Status</label>
-        <select id="f_status" class="form-select s2">
-          <option value="">All</option>
-          <option value="active">Active</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
-
-      <div class="col-md-2">
-        <label class="form-label">Vehicle No</label>
-        <input id="f_vehicle_no" type="text" class="form-control" placeholder="e.g. DHA-23-4456">
-      </div>
-
-      {{-- NEW: Customer --}}
-      <div class="col-md-2">
-        <label class="form-label">Customer</label>
-        <select id="f_customer_id" class="form-select s2">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      {{-- NEW: Material --}}
-      <div class="col-md-2">
-        <label class="form-label">Material</label>
-        <select id="f_material_id" class="form-select s2">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      {{-- NEW: Sector --}}
-      <div class="col-md-2">
-        <label class="form-label">Sector</label>
-        <select id="f_sector_id" class="form-select s2">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      {{-- NEW: User --}}
-      <div class="col-md-2">
-        <label class="form-label">User</label>
-        <select id="f_user_id" class="form-select s2">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      <div class="col-md-3 d-flex align-items-end gap-2">
-        <button id="btnApply" class="btn btn-primary w-100">
-          <i class="bi bi-funnel me-1"></i>Apply
-        </button>
-        <button id="btnReset" class="btn btn-outline-secondary" title="Reset filters">
-          <i class="bi bi-arrow-counterclockwise"></i>
-        </button>
-      </div>
-    </div>
   </div>
-</div>
 
   {{-- Table --}}
 <div class="card">
@@ -243,8 +147,6 @@
 @push('styles')
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 
 <style>
   /* compact table */
@@ -285,18 +187,6 @@
   .zoom-img{ max-width:none; max-height:none; will-change:transform; transition:transform .05s linear; }
   .dragging{ cursor:grabbing !important; }
   .zoom-container:not(.dragging){ cursor:grab; }
-  /* Select2 height bootstrap input-এর সাথে match */
-.select2-container .select2-selection--single {
-  height: 38px !important;
-  padding-top: 4px;
-}
-.select2-container--bootstrap-5 .select2-selection {
-  min-height: 38px !important;
-}
-.select2-container--open {
-  z-index: 9999; /* modal/table overlap fix */
-}
-
 </style>
 
 
@@ -307,9 +197,8 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-{{-- <script>
+<script>
   // ---- helpers ----
   function fmt2(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
   function netKG(g,t,real){const R=Number(real||0);return (R&&R>0)?R.toFixed(2):(Number(g||0)-Number(t||0)).toFixed(2)}
@@ -420,187 +309,6 @@
       $('#f_from,#f_to').val('');
       $('#f_weight_type,#f_transfer_type,#f_status').val('');
       table.ajax.reload();
-    });
-  });
-</script> --}}
-<script>
-  function fmt2(n){return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
-  function netKG(g,t,real){const R=Number(real||0);return (R&&R>0)?R.toFixed(2):(Number(g||0)-Number(t||0)).toFixed(2)}
-  function fmtDate(v){const d=new Date(v);if(isNaN(d))return v||'';return [String(d.getDate()).padStart(2,'0'),String(d.getMonth()+1).padStart(2,'0'),d.getFullYear()].join('-')}
-  function pickGrossTareAll(photos){
-    const out={gross:null,tare:null,rest:[]}; if(!Array.isArray(photos)) return out;
-    for(const p of photos){const m=String(p.mode||'').toLowerCase();
-      if(!out.gross && m==='gross'){out.gross=p;continue;}
-      if(!out.tare  && m==='tare'){out.tare=p;continue;}
-      out.rest.push(p);}
-    return out;
-  }
-
-  // ✅ missing ছিল
-  function bindOptions(selector, rows){
-    const $el = $(selector);
-    const currentVal = $el.val() ?? '';
-    $el.empty().append(new Option('All', ''));
-
-    const seen = new Set();
-    (rows || []).forEach(r => {
-      const id = String(r.id ?? '').trim();
-      const text = String(r.text ?? '').trim();
-      if (!id || !text) return;
-      const key = id + '|' + text.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      $el.append(new Option(text, id, false, false));
-    });
-
-    $el.val(currentVal);
-  }
-
-  // ✅ searchable select2
-  function initSearchableDropdowns(){
-    $('.s2').each(function(){
-      const $el = $(this);
-      if ($el.hasClass('select2-hidden-accessible')) {
-        $el.select2('destroy');
-      }
-      $el.select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: 'All',
-        allowClear: true,
-        dropdownAutoWidth: true,
-        matcher: function(params, data) {
-          const term = $.trim((params.term || '').toLowerCase());
-          if (term === '') return data;
-          const text = (data.text || '').toLowerCase();
-          return text.includes(term) ? data : null;
-        }
-      });
-    });
-  }
-
-  async function loadFilterOptions(){
-    const url = "{{ route('weight_transactions.filter_options') }}";
-
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      credentials: 'same-origin'
-    });
-
-    if (!res.ok) {
-      const t = await res.text();
-      console.error('filter-options failed:', res.status, t);
-      throw new Error(`filter-options failed: ${res.status}`);
-    }
-
-    const j = await res.json();
-    console.log('filter-options response:', j);
-
-    bindOptions('#f_customer_id', j.customers);
-    bindOptions('#f_material_id', j.materials);
-    bindOptions('#f_sector_id',   j.sectors);
-    bindOptions('#f_user_id',     j.users);
-
-    // ✅ options bind হওয়ার পরে init
-    initSearchableDropdowns();
-  }
-
-  const a4RouteTpl  = "{{ route('print.invoice', ':id') }}";
-  const posRouteTpl = "{{ route('print.pos', ':id') }}";
-
-  $(async function(){
-    try {
-      await loadFilterOptions();
-    } catch (e) {
-      console.error(e);
-    }
-
-    const table = $('#weights-table').DataTable({
-      processing:true,
-      serverSide:false,
-      deferRender:true,
-      autoWidth:false,
-      responsive:{ details:{ type:'column', target:'tr' } },
-      order:[[3,'desc']],
-      pageLength:50,
-      lengthMenu:[[50,100,-1],[50,100,'All']],
-      ajax:{
-        url:"{{ route('weight_transactions.datatable') }}",
-        data:d=>{
-          d.search_text   = $('#f_search').val();
-          d.from_date     = $('#f_from').val();
-          d.to_date       = $('#f_to').val();
-          d.weight_type   = $('#f_weight_type').val();
-          d.transfer_type = $('#f_transfer_type').val();
-          d.status        = $('#f_status').val();
-          d.vehicle_no    = $('#f_vehicle_no').val();
-
-          d.customer_id   = $('#f_customer_id').val();
-          d.material_id   = $('#f_material_id').val();
-          d.sector_id     = $('#f_sector_id').val();
-          d.user_id       = $('#f_user_id').val();
-        },
-        dataSrc:'data'
-      },
-      columns:[
-        {data:'id'},
-        {data:null, orderable:false, searchable:false, render:r=>{
-          const a4Url=a4RouteTpl.replace(':id',r.id), posUrl=posRouteTpl.replace(':id',r.id);
-          return `<div class="btn-group" role="group">
-            <a href="${a4Url}" target="_blank" class="btn btn-success btn-xxs" title="A4"><i class="bi bi-file-earmark-pdf"></i></a>
-            <a href="${posUrl}" target="_blank" class="btn btn-primary btn-xxs" title="POS"><i class="bi bi-printer"></i></a>
-          </div>`;
-        }},
-        {data:null, orderable:false, searchable:false, className:'photos-col', render:r=>{
-          const photos = Array.isArray(r.photos)?r.photos:[];
-          const {gross,tare,rest}=pickGrossTareAll(photos);
-          const payload = JSON.stringify(photos).replace(/"/g,'&quot;');
-          const g = gross? `<span class="thumb-box" title="Gross"><img src="${gross.url}" class="thumb-xxs" loading="lazy"><span class="thumb-tag">G</span></span>`:'';
-          const t = tare ? `<span class="thumb-box" title="Tare"><img src="${tare.url}" class="thumb-xxs" loading="lazy"><span class="thumb-tag">T</span></span>`:'';
-          const more = rest.length? `<span class="thumb-more">+${rest.length}</span>`:'';
-          return `<div class="d-flex align-items-center">
-            <div class="thumb-wrap open-photos" data-photos="${payload}" style="cursor:pointer">${g}${t}${more}</div>
-            <button class="btn btn-outline-${photos.length?'primary':'secondary'} btn-xxs ms-1 view-photos" data-photos="${payload}" title="${photos.length?'View photos':'No photos'}">
-              <i class="bi bi-images"></i>
-            </button>
-          </div>`;
-        }},
-        {data:'created_at', render:v=>fmtDate(v)},
-        {data:null, render:r=>`<div><div>${r.customer_name||'N/A'}</div><div class="text-muted small">${r.vendor_name||'—'}</div></div>`},
-        {data:'transaction_id', defaultContent:'N/A'},
-        {data:'weight_type', defaultContent:'N/A'},
-        {data:null, render:r=>{
-          const vt=r.vehicle_type||'N/A', vn=r.vehicle_no||'N/A';
-          return `<div><span class="badge bg-secondary me-1">${vt}</span><strong>${vn}</strong></div>`;
-        }},
-        {data:null, render:r=>`<div><div>${r.material||'N/A'}</div><div class="text-muted small">${r.productType||'—'}</div></div>`},
-        {data:'gross_weight', className:'num', render:v=>fmt2(v)},
-        {data:'tare_weight', className:'num', render:v=>fmt2(v)},
-        {data:'deduction', className:'num', render:v=>fmt2(v)},
-        {data:null, className:'num col-net', render:r=>fmt2(netKG(r.gross_weight,r.tare_weight,r.real_net))},
-        {data:'sector_name', defaultContent:'N/A'},
-        {data:'username', defaultContent:'N/A'},
-        {data:'status', render:v=>{
-          const s=String(v||'').toLowerCase();
-          const cls = s==='completed'?'bg-success': s==='cancelled'?'bg-danger': s==='active'?'bg-info':'bg-secondary';
-          return `<span class="badge ${cls} badge-upper">${v||'N/A'}</span>`;
-        }}
-      ]
-    });
-
-    $('#btnApply').on('click', ()=> table.ajax.reload());
-
-    $('#btnReset').on('click', ()=>{
-      $('#f_search,#f_vehicle_no,#f_from,#f_to').val('');
-      $('#f_weight_type,#f_transfer_type,#f_status').val('');
-      $('#f_customer_id,#f_material_id,#f_sector_id,#f_user_id').val('').trigger('change');
-      table.ajax.reload();
-    });
-
-    // Enter press → apply
-    $('#f_search,#f_vehicle_no').on('keypress', function(e){
-      if (e.which === 13) table.ajax.reload();
     });
   });
 </script>

@@ -46,6 +46,16 @@ Route::get('/weight_transactions', [WeightTransactionController::class, 'index']
 // JSON for DataTable
 Route::get('/weight_transactions/datatable', [WeightTransactionController::class, 'datatable'])
     ->name('weight_transactions.datatable');
+
+
+Route::get('/weight-transactions/filter-options', [WeightTransactionController::class, 'filterOptions'])
+    ->name('weight_transactions.filter_options');
+
+// Route::get('/weight-transactions/datatable', [WeightTransactionController::class, 'datatable'])
+//     ->name('weight_transactions.datatable');
+
+
+
 Route::get('/weight_transactions/create', [WeightTransactionController::class, 'create'])->name('weight_transactions.create');
 Route::post('/weight_transactions', [WeightTransactionController::class, 'store'])->name('weight_transactions.store');
 Route::get('/weight_transactions/{id}/edit', [WeightTransactionController::class, 'edit'])->name('weight_transactions.edit');
@@ -94,6 +104,7 @@ Route::get('/weight-transactions/{id}/print-pos', [WeightTransactionController::
 
 Route::get('/print/invoice/{id}', [PrintController::class, 'printInvoice'])->name('print.invoice');
 Route::get('/print/pos/{id}', [PrintController::class, 'printPOS'])->name('print.pos');
+
 
 });
 
