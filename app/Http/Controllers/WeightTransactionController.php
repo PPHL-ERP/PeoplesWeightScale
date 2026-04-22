@@ -397,7 +397,7 @@ public function datatable(Request $request)
             $q->where('vehicle_no','like',"%$vno%");
         }
 
-        $rows = $q->orderByDesc('created_at')->limit(2000)->get(); // cap for speed
+        $rows = $q->orderByDesc('created_at')->limit(200)->get(); // cap for speed
         return response()->json(['data' => $rows]);
     }
 
