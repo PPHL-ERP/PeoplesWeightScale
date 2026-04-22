@@ -242,7 +242,7 @@ public function datatable(Request $request)
         $q->where('vehicle_no','ilike',"%{$vno}%");
     }
 
-    $rows = $q->orderByDesc('id')->limit(2000)->get();
+    $rows = $q->orderByDesc('id')->limit(1000)->get();
 
     $data = $rows->map(function ($t) {
         $imgs = $t->imagesById->isNotEmpty() ? $t->imagesById : $t->imagesByTxn;
