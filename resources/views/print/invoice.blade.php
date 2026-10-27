@@ -88,7 +88,8 @@
                 <td><strong>Vendor:</strong> {{ $transaction->vendor_name ?? 'N/A' }}</td>
             </tr>
             <tr>
-                <td colspan="2"><strong>Sector:</strong> {{ $transaction->sector_name ?? 'N/A' }}</td>
+                @php $sectorCode = optional($transaction->sector)->sectorCode; @endphp
+                <td colspan="2"><strong>Sector:</strong> {{ $transaction->sector_name ?: (optional($transaction->sector)->name ?: 'N/A') }}@if (! is_null($sectorCode) && $sectorCode !== '') ({{ $sectorCode }})@endif</td>
             </tr>
         </table>
 

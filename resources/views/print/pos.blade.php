@@ -87,7 +87,8 @@
       </tr>
       <tr>
         <td><strong>Vehicle:</strong> {{ $transaction->vehicle_type ? $transaction->vehicle_type . ' - ' : '' }}{{ $transaction->vehicle_no ?? 'N/A' }}</td>
-        <td class="r"><strong>Sector:</strong> {{ $transaction->sector_name ?? 'N/A' }}</td>
+        @php $sectorCode = optional($transaction->sector)->sectorCode; @endphp
+        <td class="r"><strong>Sector:</strong> {{ $transaction->sector_name ?: (optional($transaction->sector)->name ?: 'N/A') }}@if (! is_null($sectorCode) && $sectorCode !== '') ({{ $sectorCode }})@endif</td>
       </tr>
       <tr>
         <td><strong>Customer:</strong> {{ $transaction->customer_name ?? 'N/A' }}</td>

@@ -105,13 +105,39 @@
     <input type="text" name="purchase_id" class="form-control" value="{{ old('purchase_id', $transaction->purchase_id ?? '') }}">
   </div>
 
+  @php
+    // Sector options come from WeightTransactionController::sectorOptions() (ACL filtered).
+    // Only `sector_id` is posted; the stored `sector_name` is derived server-side.
+    $sectorList = $sectors ?? [];
+    $currentSectorId = old('sector_id', $transaction->sector_id ?? null);
+    $currentSectorId = ($currentSectorId === null || $currentSectorId === '') ? null : (int) $currentSectorId;
+    $currentSector = $currentSectorId ? collect($sectorList)->firstWhere('id', $currentSectorId) : null;
+    $currentSectorCode = $currentSector['sectorCode'] ?? optional($transaction->sector ?? null)->sectorCode;
+    $currentSectorName = $currentSector['name'] ?? ($transaction->sector_name ?? null);
+  @endphp
+
   <div class="col-md-3">
-    <label class="form-label">Sector ID</label>
-    <input type="number" name="sector_id" class="form-control" value="{{ old('sector_id', $transaction->sector_id ?? '') }}">
+    <label class="form-label">Sector</label>
+    <select name="sector_id" id="wt_sector_id" class="form-select">
+      <option value="">-- Select Sector --</option>
+      @if ($currentSectorId && ! $currentSector)
+        {{-- current sector is soft-deleted / no longer selectable: keep the value --}}
+        <option value="{{ $currentSectorId }}" data-code="{{ $currentSectorCode }}" selected>
+          {{ $currentSectorName ?: 'Sector #'.$currentSectorId }}@if (! is_null($currentSectorCode) && $currentSectorCode !== '') ({{ $currentSectorCode }})@endif
+        </option>
+      @endif
+      @foreach ($sectorList as $sector)
+        <option value="{{ $sector['id'] }}" data-code="{{ $sector['sectorCode'] }}"
+          @selected($currentSectorId === (int) $sector['id'])>
+          {{ $sector['name'] }}@if (! is_null($sector['sectorCode']) && $sector['sectorCode'] !== '') ({{ $sector['sectorCode'] }})@endif
+        </option>
+      @endforeach
+    </select>
   </div>
   <div class="col-md-3">
-    <label class="form-label">Sector Name</label>
-    <input type="text" name="sector_name" class="form-control" value="{{ old('sector_name', $transaction->sector_name ?? '') }}">
+    <label class="form-label">Sector Code</label>
+    <input type="text" id="wt_sector_code" class="form-control" value="{{ $currentSectorCode }}" readonly title="System-managed by HRM (read only)">
+    <div class="form-text">System-managed by HRM — read only.</div>
   </div>
 
   <div class="col-md-3">
@@ -149,3 +175,22 @@
     </ul>
   </div>
 @endif
+
+@push('scripts')
+<script>
+  // Keep the read-only Sector Code in sync with the selected sector.
+  (function () {
+    var select = document.getElementById('wt_sector_id');
+    var codeInput = document.getElementById('wt_sector_code');
+    if (!select || !codeInput) return;
+
+    function sync() {
+      var opt = select.options[select.selectedIndex];
+      codeInput.value = (opt && opt.dataset && opt.dataset.code) ? opt.dataset.code : '';
+    }
+
+    select.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+@endpush

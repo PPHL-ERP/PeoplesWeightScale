@@ -401,7 +401,13 @@
         // Net (bold)
         {data:null, className:'num col-net', render:r=>fmt2(netKG(r.gross_weight,r.tare_weight,r.real_net))},
 
-        {data:'sector_name',  defaultContent:'N/A'}, // Sector
+        {data:null, render:r=>{
+          // Sector: "Name (code)" when the HRM code is known, plain name otherwise.
+          const name = r.sector_name || '';
+          const code = (r.sector_code === null || r.sector_code === undefined || r.sector_code === '') ? '' : String(r.sector_code);
+          if (!name) return code ? `— (${code})` : 'N/A';
+          return code ? `${name} (${code})` : name;
+        }}, // Sector
         {data:'username',     defaultContent:'N/A'}, // User
         {data:'status', render:v=>{
           const s=String(v||'').toLowerCase();
@@ -437,8 +443,11 @@
   }
 
   // ✅ missing ছিল
-  function bindOptions(selector, rows){
+  // opts.withCode === true renders "Name (code)" for the HRM sector code and
+  // keeps the raw code on the <option> for other widgets.
+  function bindOptions(selector, rows, opts){
     const $el = $(selector);
+    const withCode = !!(opts && opts.withCode);
     const currentVal = $el.val() ?? '';
     $el.empty().append(new Option('All', ''));
 
@@ -447,10 +456,14 @@
       const id = String(r.id ?? '').trim();
       const text = String(r.text ?? '').trim();
       if (!id || !text) return;
+      const code = String(r.code ?? '').trim();
       const key = id + '|' + text.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
-      $el.append(new Option(text, id, false, false));
+      const label = (withCode && code) ? `${text} (${code})` : text;
+      const opt = new Option(label, id, false, false);
+      if (code) opt.dataset.code = code;
+      $el.append(opt);
     });
 
     $el.val(currentVal);
@@ -499,7 +512,7 @@
 
     bindOptions('#f_customer_id', j.customers);
     bindOptions('#f_material_id', j.materials);
-    bindOptions('#f_sector_id',   j.sectors);
+    bindOptions('#f_sector_id',   j.sectors, { withCode: true });
     bindOptions('#f_user_id',     j.users);
 
     // ✅ options bind হওয়ার পরে init
@@ -579,7 +592,13 @@
         {data:'tare_weight', className:'num', render:v=>fmt2(v)},
         {data:'deduction', className:'num', render:v=>fmt2(v)},
         {data:null, className:'num col-net', render:r=>fmt2(netKG(r.gross_weight,r.tare_weight,r.real_net))},
-        {data:'sector_name', defaultContent:'N/A'},
+        {data:null, render:r=>{
+          // Sector: "Name (code)" when the HRM code is known, plain name otherwise.
+          const name = r.sector_name || '';
+          const code = (r.sector_code === null || r.sector_code === undefined || r.sector_code === '') ? '' : String(r.sector_code);
+          if (!name) return code ? `— (${code})` : 'N/A';
+          return code ? `${name} (${code})` : name;
+        }},
         {data:'username', defaultContent:'N/A'},
         {data:'status', render:v=>{
           const s=String(v||'').toLowerCase();
