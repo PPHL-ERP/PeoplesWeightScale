@@ -16,6 +16,7 @@ class SectorResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'sectorCode' => $this->sectorCode,
             'company' => $this->company ? [
                 'id' => $this->company->id ?? null,
                 'nameEn' => $this->company->nameEn ?? null,
@@ -32,6 +33,8 @@ class SectorResource extends JsonResource
             'inchargeAddress' => $this->inchargeAddress,
             'description' => $this->description,
             'status' => $this->status,
+            // Provenance of the record; `hrm` means the row is owned by the sync.
+            'source' => $this->source,
         ];
     }
 }

@@ -12,6 +12,15 @@ class Sector extends Model
 
     protected $guarded = ['id'];
 
+    /**
+     * `sectorCode` is the canonical, HRM-managed identifier shared across
+     * projects. It is read-only in this app: only the HRM sync writes it.
+     */
+    protected $casts = [
+        'sectorCode' => 'integer',
+        'synced_at' => 'datetime',
+    ];
+
     public function company()
     {
         return $this->belongsTo(Company::class, 'companyId');
