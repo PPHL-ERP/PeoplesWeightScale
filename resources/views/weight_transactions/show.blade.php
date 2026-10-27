@@ -43,7 +43,8 @@
         <div class="col-md-3"><strong>Discount:</strong> {{ $transaction->discount }}</div>
 
         <div class="col-md-3"><strong>Real Net:</strong> <span class="fw-bold">{{ $transaction->real_net }}</span></div>
-        <div class="col-md-3"><strong>Sector:</strong> {{ $transaction->sector_name }} (ID: {{ $transaction->sector_id }})</div>
+        @php $sectorCode = optional($transaction->sector)->sectorCode; @endphp
+        <div class="col-md-3"><strong>Sector:</strong> {{ $transaction->sector_name ?: (optional($transaction->sector)->name ?: 'N/A') }}@if (! is_null($sectorCode) && $sectorCode !== '') ({{ $sectorCode }})@endif (ID: {{ $transaction->sector_id ?? '—' }})</div>
         <div class="col-md-3"><strong>Sale ID:</strong> {{ $transaction->sale_id }}</div>
         <div class="col-md-3"><strong>Purchase ID:</strong> {{ $transaction->purchase_id }}</div>
 
