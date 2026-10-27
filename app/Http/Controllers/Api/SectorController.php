@@ -49,6 +49,8 @@ class SectorController extends Controller
     {
         $sector = Sector::create([
             'name' => $request->name,
+            // System-managed: only persisted when an integration supplies it.
+            'sectorCode' => $request->filled('sectorCode') ? (int) $request->input('sectorCode') : null,
             'companyId' => $request->companyId,
             'isFarm' => $request->isFarm,
             'isSalesPoint' => $request->isSalesPoint,
@@ -124,6 +126,8 @@ class SectorController extends Controller
 
         $sector->update([
             'name' => $request->name,
+            // Preserve the HRM-owned code when the payload does not carry one.
+            'sectorCode' => $request->filled('sectorCode') ? (int) $request->input('sectorCode') : $sector->sectorCode,
             'companyId' => $request->companyId,
             'isFarm' => $request->isFarm,
             'isSalesPoint' => $request->isSalesPoint,
@@ -253,7 +257,7 @@ class SectorController extends Controller
         {
             $approvedSectors = Cache::remember('sector_list_all', 9200, function () {
                 return Sector::approved()
-                    ->select('id', 'name', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
+                    ->select('id', 'name', 'sectorCode', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
                     ->get();
             });
 
@@ -269,7 +273,7 @@ class SectorController extends Controller
                 // Admin: Return all approved sectors from cache
                 $approvedSectors = Cache::remember('sector_list_all', 8200, function () {
                     return Sector::approved()
-                        ->select('id', 'name', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
+                        ->select('id', 'name', 'sectorCode', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
                         ->get();
                 });
             } else {
@@ -278,7 +282,7 @@ class SectorController extends Controller
 
                 $approvedSectors = Sector::approved()
                     ->whereIn('id', $sectorIds)
-                    ->select('id', 'name', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
+                    ->select('id', 'name', 'sectorCode', 'isFarm', 'isSalesPoint', 'salesPointName','feedDepotCost')
                     ->get();
             }
 
@@ -290,7 +294,7 @@ class SectorController extends Controller
         {
             $salesPoints = Cache::remember('sector_list_sales_points', 7200, function () {
                 return Sector::salesPoints()
-                    ->select('id', 'name', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
+                    ->select('id', 'name', 'sectorCode', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
                     ->get();
             });
 
@@ -302,7 +306,7 @@ class SectorController extends Controller
         {
             $farms = Cache::remember('sector_list_farms', 7200, function () {
                 return Sector::farms()
-                    ->select('id', 'name', 'isFarm')
+                    ->select('id', 'name', 'sectorCode', 'isFarm')
                     ->get();
             });
 
@@ -349,7 +353,7 @@ public function getSalesPointFilterList()
 
             return Sector::approved()
                 ->where('isSalesPoint', 1)
-                ->select('id', 'name', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
+                ->select('id', 'name', 'sectorCode', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
                 ->get();
         });
     } else {
@@ -359,7 +363,7 @@ public function getSalesPointFilterList()
         $approvedSectors = Sector::approved()
             ->where('isSalesPoint', 1)
             ->whereIn('id', $sectorIds)
-            ->select('id', 'name', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
+            ->select('id', 'name', 'sectorCode', 'isSalesPoint', 'salesPointName', 'feedDepotCost')
             ->get();
     }
 
@@ -378,7 +382,7 @@ public function getFarmFilterList()
 
             return Sector::approved()
                 ->where('isFarm', 1)
-                ->select('id', 'name', 'isFarm','feedDepotCost')
+                ->select('id', 'name', 'sectorCode', 'isFarm','feedDepotCost')
                 ->get();
         });
     } else {
@@ -388,7 +392,7 @@ public function getFarmFilterList()
         $approvedSectors = Sector::approved()
             ->where('isFarm', 1)
             ->whereIn('id', $sectorIds)
-            ->select('id', 'name', 'isFarm','feedDepotCost')
+            ->select('id', 'name', 'sectorCode', 'isFarm','feedDepotCost')
             ->get();
     }
 
@@ -406,7 +410,7 @@ public function getSectorTypeFilterList()
         $approvedSectors = Cache::remember('sector_list_chicks', 7200, function () {
             return Sector::approved()
                 ->where('sectorType', 'Chicks') // ✅ Only Chicks
-                ->select('id', 'name', 'feedDepotCost')
+                ->select('id', 'name', 'sectorCode', 'feedDepotCost')
                 ->get();
         });
     } else {
@@ -416,7 +420,7 @@ public function getSectorTypeFilterList()
         $approvedSectors = Sector::approved()
             ->whereIn('id', $sectorIds)
             ->where('sectorType', 'Chicks') // ✅ Only Chicks
-            ->select('id', 'name', 'feedDepotCost')
+            ->select('id', 'name', 'sectorCode', 'feedDepotCost')
             ->get();
     }
 

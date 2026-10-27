@@ -70,7 +70,8 @@ public function filterOptions(Request $request)
         $sectorsQ = DB::table('sectors')
             ->whereNull('deleted_at')
             ->whereRaw("TRIM(COALESCE(name, '')) <> ''")
-            ->selectRaw('id, TRIM(name) as text');
+            // `sectorCode` is the HRM-assigned code; it stays null for local-only rows.
+            ->selectRaw('id, TRIM(name) as text, "sectorCode" as code');
 
         if (!$isAdmin) {
             if (empty($allowedSectorIds)) {
@@ -125,22 +126,26 @@ public function filterOptions(Request $request)
 public function datatable(Request $request)
 {
     $q = WeightTransaction::query()
+        // Read-only join for the HRM sector code. Soft-deleted sectors are kept in
+        // the join so historical rows still render their code.
+        ->leftJoin('sectors', 'sectors.id', '=', 'weight_transactions.sector_id')
         ->with([
             'imagesById:id,weighing_id,image_path,storage_backend,mode,captured_at,sector_id',
             'imagesByTxn:id,transaction_id,image_path,storage_backend,mode,captured_at,sector_id',
         ])
         ->select([
-            'id','transaction_id',
-            'weight_type','transfer_type','select_mode',
-            'vehicle_type','vehicle_no',
-            'material','productType',
-            'gross_weight','tare_weight','real_net',
-            'deduction',
-            'volume','price','discount','amount',
-            'customer_name',
-            'sale_id','purchase_id',
-            'sector_id','sector_name','username',
-            'status','created_at',
+            'weight_transactions.id','weight_transactions.transaction_id',
+            'weight_transactions.weight_type','weight_transactions.transfer_type','weight_transactions.select_mode',
+            'weight_transactions.vehicle_type','weight_transactions.vehicle_no',
+            'weight_transactions.material','weight_transactions.productType',
+            'weight_transactions.gross_weight','weight_transactions.tare_weight','weight_transactions.real_net',
+            'weight_transactions.deduction',
+            'weight_transactions.volume','weight_transactions.price','weight_transactions.discount','weight_transactions.amount',
+            'weight_transactions.customer_name',
+            'weight_transactions.sale_id','weight_transactions.purchase_id',
+            'weight_transactions.sector_id','weight_transactions.sector_name','weight_transactions.username',
+            'weight_transactions.status','weight_transactions.created_at',
+            DB::raw('sectors."sectorCode" as sector_code'),
         ]);
 
     // ---------- USER SECTOR SCOPE (auth/session safe) ----------
@@ -152,7 +157,7 @@ public function datatable(Request $request)
 
     if ($isAdmin) {
         if ($requestedSectorId > 0) {
-            $q->where('sector_id', $requestedSectorId);
+            $q->where('weight_transactions.sector_id', $requestedSectorId);
         }
     } else {
         if (empty($allowedSectorIds)) {
@@ -160,12 +165,12 @@ public function datatable(Request $request)
         } else {
             if ($requestedSectorId > 0) {
                 if (in_array($requestedSectorId, $allowedSectorIds, true)) {
-                    $q->where('sector_id', $requestedSectorId);
+                    $q->where('weight_transactions.sector_id', $requestedSectorId);
                 } else {
                     $q->whereRaw('1=0');
                 }
             } else {
-                $q->whereIn('sector_id', $allowedSectorIds);
+                $q->whereIn('weight_transactions.sector_id', $allowedSectorIds);
             }
         }
     }
@@ -178,7 +183,9 @@ public function datatable(Request $request)
               ->orWhere('customer_name','ilike',"%{$s}%")
               ->orWhere('material','ilike',"%{$s}%")
               ->orWhere('sector_name','ilike',"%{$s}%")
-              ->orWhere('username','ilike',"%{$s}%");
+              ->orWhere('username','ilike',"%{$s}%")
+              // HRM sector code (matched as text so "12" finds 12)
+              ->orWhereRaw('CAST(sectors."sectorCode" AS TEXT) ILIKE ?', ["%{$s}%"]);
         });
     }
 
@@ -231,18 +238,18 @@ public function datatable(Request $request)
     // ---------- Other filters ----------
     if ($from = $request->get('from_date')) {
         $to = $request->get('to_date') ?: $from;
-        $q->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59']);
+        $q->whereBetween('weight_transactions.created_at', [$from.' 00:00:00', $to.' 23:59:59']);
     }
 
     if ($wt = $request->get('weight_type'))   $q->where('weight_type', $wt);
     if ($tt = $request->get('transfer_type')) $q->where('transfer_type', $tt);
-    if ($st = $request->get('status'))        $q->where('status', $st);
+    if ($st = $request->get('status'))        $q->where('weight_transactions.status', $st);
 
     if ($vno = trim((string)$request->get('vehicle_no'))) {
         $q->where('vehicle_no','ilike',"%{$vno}%");
     }
 
-    $rows = $q->orderByDesc('id')->limit(1000)->get();
+    $rows = $q->orderByDesc('weight_transactions.id')->limit(1000)->get();
 
     $data = $rows->map(function ($t) {
         $imgs = $t->imagesById->isNotEmpty() ? $t->imagesById : $t->imagesByTxn;
@@ -276,6 +283,8 @@ public function datatable(Request $request)
             'purchase_id'    => $t->purchase_id,
             'sector_id'      => $t->sector_id,
             'sector_name'    => $t->sector_name,
+            // HRM-assigned sector code (null until the sector has been synced).
+            'sector_code'    => $t->sector_code !== null ? (int) $t->sector_code : null,
             'username'       => $t->username,
             'status'         => $t->status,
             'created_at'     => $t->created_at,
@@ -315,6 +324,82 @@ public function datatable(Request $request)
             ->unique()
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Sector master rows the current user may pick from (same ACL as filterOptions).
+     *
+     * @return array<int, array{id:int,name:string,sectorCode:int|null}>
+     */
+    private function sectorOptions(): array
+    {
+        $userId = $this->currentUserId();
+        $isAdmin = $this->isAdminUser($userId);
+        $allowedSectorIds = $this->allowedSectorIds($userId);
+
+        $query = DB::table('sectors')
+            ->whereNull('deleted_at')
+            ->whereRaw("TRIM(COALESCE(name, '')) <> ''")
+            ->select('id', 'name', 'sectorCode');
+
+        if (!$isAdmin) {
+            if (empty($allowedSectorIds)) {
+                $query->whereRaw('1=0');
+            } else {
+                $query->whereIn('id', $allowedSectorIds);
+            }
+        }
+
+        return $query
+            ->orderBy('name')
+            ->get()
+            ->map(fn($row) => [
+                'id' => (int) $row->id,
+                'name' => trim((string) $row->name),
+                'sectorCode' => $row->sectorCode !== null ? (int) $row->sectorCode : null,
+            ])
+            ->all();
+    }
+
+    /**
+     * Resolve the sector name from `sector_id` so the form never posts a free-text name.
+     *
+     * The `sector_id` + `sector_name` payload contract is unchanged; when an id is
+     * supplied the server-side name wins, otherwise a posted name is kept as-is.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withDerivedSectorName(array $data): array
+    {
+        $hasSectorId = array_key_exists('sector_id', $data);
+        $sectorId = $hasSectorId && is_numeric($data['sector_id']) ? (int) $data['sector_id'] : 0;
+
+        if ($sectorId <= 0) {
+            if (array_key_exists('sector_name', $data)) {
+                // An explicitly posted name keeps the old payload contract working.
+                $name = trim((string) $data['sector_name']);
+                $data['sector_name'] = $name !== '' ? $name : null;
+            } elseif ($hasSectorId) {
+                // Sector cleared in the form and no name supplied.
+                $data['sector_name'] = null;
+            }
+
+            return $data;
+        }
+
+        $name = DB::table('sectors')
+            ->where('id', $sectorId)
+            ->whereNull('deleted_at')
+            ->value('name');
+
+        $name = trim((string) $name);
+
+        if ($name !== '') {
+            $data['sector_name'] = $name;
+        }
+
+        return $data;
     }
 
 
@@ -406,7 +491,8 @@ public function datatable(Request $request)
     public function create()
     {
         $statuses = ['Unfinished', 'Finished', 'Reject'];
-        return view('weight_transactions.create', compact('statuses'));
+        $sectors = $this->sectorOptions();
+        return view('weight_transactions.create', compact('statuses', 'sectors'));
     }
 
     public function store(Request $request)
@@ -425,7 +511,7 @@ public function datatable(Request $request)
 
     public function show($id)
     {
-        $transaction = WeightTransaction::findOrFail($id);
+        $transaction = WeightTransaction::with('sector:id,name,sectorCode')->findOrFail($id);
         return view('weight_transactions.show', compact('transaction'));
     }
 
@@ -437,8 +523,9 @@ public function datatable(Request $request)
     // }
     public function edit($id)
 {
-    $transaction = WeightTransaction::findOrFail($id);
+    $transaction = WeightTransaction::with('sector:id,name,sectorCode')->findOrFail($id);
     $statuses = ['Unfinished','Finished','Reject'];
+    $sectors = $this->sectorOptions();
 
     // previous URL সেশন-এ রাখা (edit পেজ না হলে)
     $prev = url()->previous();
@@ -446,7 +533,7 @@ public function datatable(Request $request)
         session(['wt_return' => $prev]);
     }
 
-    return view('weight_transactions.edit', compact('transaction','statuses'));
+    return view('weight_transactions.edit', compact('transaction','statuses','sectors'));
 }
 
     public function update(Request $request, $id)
@@ -479,7 +566,7 @@ public function datatable(Request $request)
 
     private function validatePayload(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'transaction_id' => ['nullable','string','max:100'],
             'weight_type'    => ['nullable','string','max:50'],
             'transfer_type'  => ['nullable','string','max:50'],
@@ -518,6 +605,9 @@ public function datatable(Request $request)
             'username'       => ['nullable','string','max:100'],
             'status'         => ['nullable', Rule::in(['Unfinished','Finished','Reject'])],
         ]);
+
+        // The sector form only posts `sector_id`; the stored name is derived here.
+        return $this->withDerivedSectorName($data);
     }
 
     private function calcAmount($volume, $price): ?float

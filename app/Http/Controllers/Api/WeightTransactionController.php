@@ -24,7 +24,8 @@ class WeightTransactionController extends Controller
                 'weight_transactions.*',
                 'w_customer.cName as customer_name',
                 'w_vendor.vName as vendor_name',
-                'sectors.name as sector_name'
+                'sectors.name as sector_name',
+                DB::raw('sectors."sectorCode" as sector_code')
             )
             ->when($search, function ($query, $search) {
                 $query->where('weight_transactions.transaction_id', 'like', "%{$search}%")
@@ -86,7 +87,8 @@ class WeightTransactionController extends Controller
                   'weight_transactions.*',
                   'w_customer.cName as customer_name',
                   'w_vendor.vName as vendor_name',
-                  'sectors.name as sector_name'
+                  'sectors.name as sector_name',
+                  DB::raw('sectors."sectorCode" as sector_code')
               );
 
         // Filters
@@ -112,7 +114,18 @@ class WeightTransactionController extends Controller
             $query->whereBetween('weight_transactions.created_at', [$request->from_date, $request->to_date]);
         }
 
-        return response()->json($query->orderByDesc('weight_transactions.id')->get());
+        $rows = $query->orderByDesc('weight_transactions.id')->get();
+
+        // Additive only: `sector_code` is already one of the row attributes selected
+        // above, so this only normalises the pgsql BIGINT (returned as a string) to
+        // int|null without changing the row shape.
+        $rows->each(function ($transaction) {
+            $transaction->sector_code = $transaction->sector_code !== null
+                ? (int) $transaction->sector_code
+                : null;
+        });
+
+        return response()->json($rows);
     }
 
 
@@ -284,14 +297,17 @@ class WeightTransactionController extends Controller
             $data['amount']   = $amount;
             $data['real_net'] = $realNet;
 
-            // Lightweight lookups (names)
+            // Lightweight lookups (names) — `sector_code` is resolved for the response
+            // only; weight_transactions has no such column and must not receive one.
+            $sectorCode = null;
             if (!empty($data['customer_id'])) {
                 $c = DB::table('w_customer')->select('cName')->where('id', $data['customer_id'])->first();
                 $data['customer_name'] = $c->cName ?? null;
             }
             if (!empty($data['sector_id'])) {
-                $s = DB::table('sectors')->select('name')->where('id', $data['sector_id'])->first();
+                $s = DB::table('sectors')->select('name', 'sectorCode')->where('id', $data['sector_id'])->first();
                 $data['sector_name'] = $s->name ?? null;
+                $sectorCode = isset($s->sectorCode) ? (int) $s->sectorCode : null;
             }
             if (!empty($data['vendor_id'])) {
                 $v = DB::table('w_vendor')->select('vName')->where('id', $data['vendor_id'])->first();
@@ -311,9 +327,13 @@ class WeightTransactionController extends Controller
                     'transaction_id'  => $transaction->transaction_id ?? null,
                 ]);
 
+                // Response-only additive key: never written back to weight_transactions.
+                $responseData = $transaction ? $transaction->toArray() : [];
+                $responseData['sector_code'] = $sectorCode;
+
                 return response()->json([
                     'status' => 'created',
-                    'data'    => $transaction,
+                    'data'    => $responseData,
                     'rid'     => $rid,
                 ], 201);
             } catch (\Throwable $e) {
@@ -333,8 +353,21 @@ class WeightTransactionController extends Controller
     // ✅ Show one
     public function show($id)
     {
-        $transaction = WeightTransaction::findOrFail($id);
-        return response()->json($transaction);
+        // withTrashed keeps the HRM code visible for historical rows whose sector
+        // has been soft-deleted (parity with the raw leftJoin used by index()).
+        $transaction = WeightTransaction::with([
+            'sector' => fn ($query) => $query->withTrashed()->select('id', 'name', 'sectorCode'),
+        ])->findOrFail($id);
+
+        // Additive only: expose the HRM sector code without nesting a `sector` object
+        // in the existing payload.
+        $payload = $transaction->toArray();
+        unset($payload['sector']);
+        $payload['sector_code'] = $transaction->sector?->sectorCode !== null
+            ? (int) $transaction->sector->sectorCode
+            : null;
+
+        return response()->json($payload);
     }
 
     // ✅ Update
@@ -395,9 +428,11 @@ class WeightTransactionController extends Controller
             $validated['vendor_name'] = $vendor->vName ?? null;
         }
 
+        $sectorCode = null;
         if (!empty($validated['sector_id'])) {
-            $sector = \DB::table('sectors')->find($validated['sector_id']);
+            $sector = \DB::table('sectors')->select('name', 'sectorCode')->find($validated['sector_id']);
             $validated['sector_name'] = $sector->name ?? null;
+            $sectorCode = isset($sector->sectorCode) ? (int) $sector->sectorCode : null;
         }
 
         // Only set vendor_name if the DB has that column (migration may add it).
@@ -417,9 +452,20 @@ class WeightTransactionController extends Controller
         // refresh to load any DB-level changes and ensure transaction_id is present
         $transaction->refresh();
 
+        // Response-only additive key, never written back to weight_transactions.
+        // Falls back to the sector now attached to the refreshed row so the code is
+        // still reported when the request did not change sector_id.
+        if ($sectorCode === null && !empty($transaction->sector_id)) {
+            $code = DB::table('sectors')->where('id', $transaction->sector_id)->value('sectorCode');
+            $sectorCode = $code !== null ? (int) $code : null;
+        }
+
+        $responseData = $transaction->toArray();
+        $responseData['sector_code'] = $sectorCode;
+
         return response()->json([
             'status' => 'updated',
-            'data'    => $transaction,
+            'data'    => $responseData,
         ]);
     }
 
