@@ -134,6 +134,10 @@ CREATE INDEX IF NOT EXISTS idx_img_weighing_checksum ON transaction_images(weigh
 CREATE INDEX IF NOT EXISTS idx_img_transaction_checksum ON transaction_images(transaction_id, checksum_sha256);
 CREATE INDEX IF NOT EXISTS idx_img_isSynced ON transaction_images(isSynced);
 
+Both DDL templates intentionally omit `sector_code`: it is not a `weight_transactions`
+column. API responses derive it from the `sectors."sectorCode"` column maintained by the
+HRM sector sync (see "Read-only `sector_code` field").
+
 ---
 
 ## API Endpoints (required by frontend)
@@ -164,8 +168,9 @@ All endpoints accept and return JSON unless noted.
 - Response (201):
   {
     "success": true,
-    "data": { "id": 123 }
+    "data": { "id": 123, "sector_code": 42 }
   }
+  - `sector_code` (integer or null) is an additive, read-only field resolved from the transaction's sector; it is never accepted on write and never stored on `weight_transactions`. See "Read-only `sector_code` field" below.
 - Errors: 422 for validation errors, 500 for server errors.
 
 2) Upload image (current preferred endpoint)
@@ -195,16 +200,43 @@ All endpoints accept and return JSON unless noted.
 - URL: PUT /api/updateweight-transactions/{id}
 - Purpose: Update fields on an existing transaction. This must accept `isSynced` and persist it.
 - Request body (JSON): subset of fields used in Create endpoint.
-- Response (200): { "success": true, "data": { "id": 123 } }
+- Response (200): { "success": true, "data": { "id": 123, "sector_code": 42 } }
+  - `sector_code` is read-only and resolved from the sector attached to the stored row (after refresh), so it is reported even when the request did not change `sector_id`. It is `null` when the row has no sector or the sector has no HRM code.
 
 4) Get transactions (list)
 - URL: GET /api/getweight-transactions
 - Query params: optional pagination and filters (identity, sector_id, isSynced)
-- Response (200): { "success": true, "data": [ { transaction row }, ... ] }
+- Response (200): { "success": true, "data": [ { transaction row, ..., "sector_code": 42 }, ... ] }
+  - Every row keeps its existing keys and gains `sector_code` (integer or null), read from the joined `sectors."sectorCode"`.
+
+4b) Get one transaction
+- URL: GET /api/weight-transactions/{id}
+- Response (200): the transaction row as a JSON object (the same shape as one list row, including `sector_code`). If the transaction does not exist the endpoint returns 404.
+- No nested `sector` object is returned; `sector_id` / `sector_name` / `sector_code` stay flat.
 
 5) (Optional) Upload older client flow
 - URL: POST /api/v1/images/uploadold
 - Behavior: Backwards-compatible endpoint. Same idempotency rules.
+
+### Read-only `sector_code` field
+
+`weight_transactions` has **no** `sector_code` column. The endpoints above add a
+`sector_code` key derived from `sectors."sectorCode"` for the row's `sector_id`:
+
+| Endpoint | Where the key appears |
+| --- | --- |
+| `POST /api/storeweight-transactions` | inside the response `data` object |
+| `PUT /api/updateweight-transactions/{id}` | inside the response `data` object |
+| `GET /api/getweight-transactions` | on every returned row |
+| `GET /api/weight-transactions/{id}` | on the returned object |
+
+Rules:
+
+- Type is integer or null. Postgres returns BIGINT as a string, so the API casts it.
+- `null` when `sector_id` is empty, the sector is gone, or the sector has not been synced from HRM yet.
+- It is never accepted from the request body and never written to the table: the write paths' `$request->only()` list and validation rules are unchanged, so an extra `sector_code` in a request is ignored.
+- Existing `sector_id` / `sector_name` keys and all other keys are unchanged; clients that do not know the key can simply ignore it.
+- A soft-deleted sector still reports its code in the list and single-transaction reads, so historical rows keep their code.
 
 ---
 
@@ -226,6 +258,7 @@ All endpoints accept and return JSON unless noted.
   - transaction_date: required, date (YYYY-MM-DD)
   - gross_weight, tare_weight, price_per_kg: numeric
   - sector_id: integer (optional)
+  - sector_code: not accepted — read-only, derived server-side from `sectors."sectorCode"`
   - isSynced: boolean (optional)
 
 - Upload image:
@@ -239,6 +272,7 @@ All endpoints accept and return JSON unless noted.
   - id path param required
   - body fields optional
   - isSynced: boolean allowed
+  - sector_code: not accepted — read-only, derived server-side after the row is refreshed
 
 ---
 
