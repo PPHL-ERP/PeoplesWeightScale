@@ -68,9 +68,18 @@ public function sectorAllView(): JsonResponse
 {
     $sectors = DB::select("SELECT * FROM sectors_view");
 
+    // Additive only: the desktop scale app keeps resolving sectors by id/name,
+    // `sector_code` is exposed so it can adopt the HRM code later.
+    $data = array_map(function ($sector) {
+        $row = (array) $sector;
+        $row['sector_code'] = $row['sectorCode'] ?? null;
+
+        return $row;
+    }, $sectors);
+
     return response()->json([
         'status' => 'success',
-        'data' => $sectors,
+        'data' => $data,
     ]);
 }
 

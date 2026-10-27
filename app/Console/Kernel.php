@@ -13,6 +13,12 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
+
+        // HRM owns the canonical sectorCode; keep the local sector master in step.
+        $schedule->command('weight-scale:sync-sectors-from-hrm')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->when(fn (): bool => (bool) config('hrm.sync_enabled'));
     }
 
     /**
